@@ -1,6 +1,17 @@
-## Design docs: [docs/rvdbt.md](docs/rvdbt.md)
+## My progress and todo
+### Progress
+- The llvm-15 for reproduce is installed from apt. Building rvdbt somehow fails, when using llvm-15 building from source.
+- I cannot reproduce on `riscv32-unknown-linux-gnu-gcc 12.2.0`, so I use `riscv32-unknown-elf-gcc 12.2.0` instead.
+- The `riscv32-unknown-elf-gcc` is built from `riscv-gnu-toolchain`. Remember to add `--with-arch=rv32ia` to configure.
+### Todo
+For a first-step experiment, I want to make sure how gcc 14 or llvm 19 affects improvements. So I will create two branch to test.
 
-### Building rvdbt
+1. Implement forked repo on gcc 14 and llvm 19
+2. Find a better method to utitlize the profile data to run faster.
+## Originally
+Below are original content from the forked repo.
+### Design docs: [docs/rvdbt.md](docs/rvdbt.md)
+#### Building for rvdbt
 ```sh
 # Pre-install clang++, cmake, ninja-build, libboost-all-dev, llvm-15, llvm-15-dev
 
@@ -10,7 +21,7 @@ mkdir build && cd build
 CC=clang CXX=clang++ cmake -GNinja -DCMAKE_BUILD_TYPE=Debug ..
 ninja
 ```
-### Using rvdbt
+#### Using rvdbt
 ```sh
 # First of all, rvdbt is only a proof of concept, it is quite unstable.
 # File IO, memory maps, timers are permitted, rvdbt is able to run
