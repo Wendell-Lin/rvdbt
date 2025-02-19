@@ -2,7 +2,13 @@
 ### Progress
 - The llvm-15 for reproduce is installed from apt. Building rvdbt somehow fails, when using llvm-15 building from source.
 - I cannot reproduce on `riscv32-unknown-linux-gnu-gcc 12.2.0`, so I use `riscv32-unknown-elf-gcc 12.2.0` instead.
-- The `riscv32-unknown-elf-gcc` is built from `riscv-gnu-toolchain`. Remember to add `--with-arch=rv32ia` to configure.
+- The `riscv32-unknown-elf-gcc` is built from `riscv-gnu-toolchain`. Remember to add `--with-arch=rv32ia` to configure. E.g.,
+```sh
+./configure --prefix=/opt/riscv32 \
+            --with-arch=rv32ia \
+            --with-abi=ilp32 \
+            --enable-multilib
+```
 ### Todo
 For a first-step experiment, I want to make sure how gcc 14 or llvm 19 affects improvements. So I will create two branch to test.
 
