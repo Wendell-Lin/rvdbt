@@ -11,9 +11,10 @@
 ```
 - You can fetch gcc version tag and checkout to it under `riscv-gnu-toolchain` to configure.
 - gcc 12.2.0, 14.2.0, and 14.2.1 can all be used directly.
+- llvm 19 also seems working direclty.
 ### Todo
 For a first-step experiment, I want to make sure how gcc 14 or llvm 19 affects improvements.
-gcc 14.2.* can run directly w/o any modification, so only branch llvm-19 would be created.
+gcc 14.2.* and llvm 19 can run directly w/o any modification, so I would implement more instruction set and a better method to profile directly.
 
 1. Implement forked repo on gcc 14 and llvm 19
 2. Find a better method to utitlize the profile data to run faster.
