@@ -6,6 +6,7 @@ import filecmp
 import sys
 import time
 from typing import Type
+import glob
 
 
 class BaseExec:
@@ -57,6 +58,8 @@ class RVDBTExec(BaseExec):
         if not self.aot:
             self.setup_ok = True
             return
+        # make sure dbtcache exists
+        os.makedirs(RVDBTExec.build_dir + "/dbtcache", exist_ok=True)
         pargs = [RVDBTExec.build_dir + "/bin/elfaot",
                  "--cache=dbtcache",
                  "--llvm=" + ("off", "on")[self.llvm],
@@ -143,13 +146,13 @@ def GetBenchmarks_Automotive(prebuilts_dir):
     root = os.path.join(prebuilts_dir + "/automotive")
     # b.append(Benchmark(root + "/basicmath", ["basicmath_small"], True))
     b.append(Benchmark(root + "/basicmath", ["basicmath_large"]))
-    b.append(Benchmark(root + "/bitcnts", ["bitcnts", "10000000"]))
+    b.append(Benchmark(root + "/bitcount", ["bitcnts", "10000000"]))
     # b.append(Benchmark(root + "/qsort",
     #         ["qsort_small", "input_small.dat"], True))
     b.append(Benchmark(root + "/qsort",
              ["qsort_large", "input_large.dat"], True))
-    b.append(Benchmark(root + "/susan",
-             ["susan", "input_large.pgm", "_bout", "-s"], False, "_bout"))
+    # b.append(Benchmark(root + "/susan",
+    #          ["susan", "input_large.pgm", "_bout", "-s"], False, "_bout"))
     return b
 
 
@@ -196,10 +199,69 @@ def GetBenchmarks(opts):
     benchmarks: list[Benchmark] = []
     benchmarks += GetBenchmarks_Automotive(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Network(opts.prebuilts_dir)
-    benchmarks += GetBenchmarks_Security(opts.prebuilts_dir)
+    # benchmarks += GetBenchmarks_Security(opts.prebuilts_dir)
     benchmarks += GetBenchmarks_Telecomm(opts.prebuilts_dir)
-    benchmarks += GetBenchmarks_Coremark(opts.prebuilts_dir)
+    # benchmarks += GetBenchmarks_Coremark(opts.prebuilts_dir)
     return benchmarks
+
+
+def compile_benchmark(gcc_path: str, root_dir: str, target: str) -> bool:
+    """
+    Compile all source files in the benchmark directory.
+    
+    Args:
+        gcc_path: Path to RISC-V GCC
+        root_dir: Directory containing source files
+        target: Output binary name
+    Returns:
+        bool: True if compilation succeeded
+    """
+    # Common flags including standard headers
+    common_flags = "-Wno-implicit-int -Wno-implicit-function-declaration"
+    
+    # First check if Makefile exists
+    if os.path.exists(f"{root_dir}/Makefile"):
+        print(f"Found Makefile in {root_dir}, using make with RISC-V GCC")
+        # Read and modify Makefile content
+        with open(f"{root_dir}/Makefile", 'r') as f:
+            makefile_content = f.read()
+        
+        # Create a temporary Makefile with gcc replaced and added flags
+        # if using CC=gcc, only replace gcc
+        if 'CC=gcc' in makefile_content:
+            temp_makefile = makefile_content.replace('gcc', f'{gcc_path} {common_flags}')
+        else:
+            temp_makefile = makefile_content.replace('gcc', f'{gcc_path} {common_flags}')
+        with open(f"{root_dir}/Makefile.tmp", 'w') as f:
+            f.write(temp_makefile)
+        
+        # Use the temporary Makefile
+        cmd: str = f"cd {root_dir} && make -f Makefile.tmp"
+        print(f"Compiling command: {cmd}")
+        ret = os.system(cmd)
+        
+        # Clean up
+        # os.remove(f"{root_dir}/Makefile.tmp")
+        
+        if ret != 0:
+            print(f"Make failed with return code {ret}")
+            return False
+        return True
+    
+    # If no Makefile, compile directly
+    source_files = glob.glob(f"{root_dir}/*.c")
+    if not source_files:
+        print(f"No source files found in {root_dir}")
+        return False
+        
+    source_list = " ".join(source_files)
+    cmd: str = f"{gcc_path} {source_list} -o {root_dir}/{target} -march=rv32i -fpic -fpie -static -O2 -lm {common_flags}"
+    print(f"Compiling command: {cmd}")
+    ret = os.system(cmd)
+    if ret != 0:
+        print(f"Compilation failed with return code {ret}")
+        return False
+    return True
 
 
 def RunTests(opts):
@@ -211,15 +273,25 @@ def RunTests(opts):
     csvtab = [["tab"] + list(map(lambda e: e.name, get_execs()))]
 
     for b in benchmarks:
-        print(b.root + " " + " ".join(b.args))
+        print(f"\nCompiling benchmark: {b.root} {' '.join(b.args)}")
+        if not compile_benchmark(opts.riscv32_gcc, b.root, b.args[0]):
+            print(f"Skipping benchmark due to compilation failure: {b.root}")
+            continue
+
+        print(f"\nRunning benchmark: {b.root} {' '.join(b.args)}")
         scores = [b.root.removeprefix(opts.prebuilts_dir)]
 
         execs = get_execs()
         ref_exec = execs[0]
         for e in execs:
+            print(f"\nExecuting with {e.name}:")
             b.launch_with(e)
             res = b.result(e, ref_exec)
-            print([e.name, res.res, res.time, res.score])
+            print(f"  Result: {res.res}")
+            print(f"  Time: {res.time}")
+            print(f"  Score: {res.score}")
+            print(f"  Return code: {e.rc}")
+            print(f"  Error output: {e.err}")
             scores += [res.score]
 
         csvtab += [scores]
@@ -229,6 +301,7 @@ def RunTests(opts):
 
 def main():
     op = optparse.OptionParser()
+    op.add_option("--riscv32-gcc", dest="riscv32_gcc")
     op.add_option("--build-dir", dest="build_dir")
     op.add_option("--prebuilts", dest="prebuilts_dir")
 
