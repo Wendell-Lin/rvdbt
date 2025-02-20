@@ -149,8 +149,8 @@ def GetBenchmarks_Automotive(prebuilts_dir):
     b.append(Benchmark(root + "/bitcount", ["bitcnts", "10000000"]))
     # b.append(Benchmark(root + "/qsort",
     #         ["qsort_small", "input_small.dat"], True))
-    b.append(Benchmark(root + "/qsort",
-             ["qsort_large", "input_large.dat"], True))
+    # b.append(Benchmark(root + "/qsort",
+    #          ["qsort_large", "input_large.dat"], True))
     # b.append(Benchmark(root + "/susan",
     #          ["susan", "input_large.pgm", "_bout", "-s"], False, "_bout"))
     return b
@@ -217,9 +217,11 @@ def compile_benchmark(gcc_path: str, root_dir: str, target: str) -> bool:
         bool: True if compilation succeeded
     """
     # Common flags including standard headers
+    # if os.path.exists(f"{root_dir}/{target}"):
+    #     return True
+    # Temp avoid
     common_flags = "-Wno-implicit-int -Wno-implicit-function-declaration"
-    
-    # First check if Makefile exists
+    # temporarily just do not compile here to avoid mistracking compilation flags
     if os.path.exists(f"{root_dir}/Makefile"):
         print(f"Found Makefile in {root_dir}, using make with RISC-V GCC")
         # Read and modify Makefile content
@@ -228,12 +230,10 @@ def compile_benchmark(gcc_path: str, root_dir: str, target: str) -> bool:
         
         # Create a temporary Makefile with gcc replaced and added flags
         # if using CC=gcc, only replace gcc
-        if 'CC=gcc' in makefile_content:
-            temp_makefile = makefile_content.replace('gcc', f'{gcc_path} {common_flags}')
-        else:
-            temp_makefile = makefile_content.replace('gcc', f'{gcc_path} {common_flags}')
+        if 'riscv32' not in makefile_content:
+            makefile_content = makefile_content.replace('gcc', f'{gcc_path} {common_flags}')
         with open(f"{root_dir}/Makefile.tmp", 'w') as f:
-            f.write(temp_makefile)
+            f.write(makefile_content)
         
         # Use the temporary Makefile
         cmd: str = f"cd {root_dir} && make -f Makefile.tmp"
@@ -255,7 +255,9 @@ def compile_benchmark(gcc_path: str, root_dir: str, target: str) -> bool:
         return False
         
     source_list = " ".join(source_files)
-    cmd: str = f"{gcc_path} {source_list} -o {root_dir}/{target} -march=rv32i -fpic -fpie -static -O2 -lm {common_flags}"
+    # all O2 static linking only
+
+    cmd: str = f"{gcc_path} {source_list} -o {root_dir}/{target} -march=rv32i -static -O2 -lm {common_flags}"
     print(f"Compiling command: {cmd}")
     ret = os.system(cmd)
     if ret != 0:
