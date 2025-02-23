@@ -1,4 +1,4 @@
 python3 examples/benchmarks.py \
     --build-dir $(pwd)/build \
-    --prebuilts $(pwd)/prebuilts/mibench \
+    --prebuilts $(pwd)/prebuilts \
     --riscv32-gcc riscv32-unknown-elf-gcc

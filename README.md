@@ -1,23 +1,5 @@
 ## My progress and todo
-### Progress
-- The llvm-15 for reproduce is installed from apt. Building rvdbt somehow fails, when using llvm-15 building from source.
-- I cannot reproduce on `riscv32-unknown-linux-gnu-gcc 12.2.0`, so I use `riscv32-unknown-elf-gcc 12.2.0` instead.
-- The `riscv32-unknown-elf-gcc` is built from `riscv-gnu-toolchain`. Remember to add `--with-arch=rv32ia` to configure. E.g.,
-```sh
-./configure --prefix=/opt/riscv32 \
-            --with-arch=rv32ia \
-            --with-abi=ilp32 \
-            --enable-multilib
-```
-- You can fetch gcc version tag and checkout to it under `riscv-gnu-toolchain` to configure.
-- gcc 12.2.0, 14.2.0, and 14.2.1 can all be used directly.
-- llvm 19 also seems working direclty.
-### Todo
-For a first-step experiment, I want to make sure how gcc 14 or llvm 19 affects improvements.
-gcc 14.2.* and llvm 19 can run directly w/o any modification, so I would implement more instruction set and a better method to profile directly.
-
-1. Implement forked repo on gcc 14 and llvm 19
-2. Find a better method to utitlize the profile data to run faster.
+https://hackmd.io/iDSBjMJTSTiiBJ8ODpPvTQ?both
 ## Originally
 Below are original content from the forked repo.
 ### Design docs: [docs/rvdbt.md](docs/rvdbt.md)

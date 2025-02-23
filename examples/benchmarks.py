@@ -43,6 +43,21 @@ class QEMUExec(BaseExec):
         self.rc = p.returncode
         self.time = timer
 
+class LIBRISCVExec(BaseExec):
+    bin_path = "rvlinux"
+
+    def __init__(self):
+        self.name = "libriscv"
+
+    def run(self):
+        pargs = [LIBRISCVExec.bin_path] + self.args
+        timer = time.time()
+        p = subprocess.Popen(pargs, cwd=self.root,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.out, self.err = p.communicate()
+        timer = time.time() - timer
+        self.rc = p.returncode
+        self.time = timer
 
 class RVDBTExec(BaseExec):
     build_dir = None
@@ -88,7 +103,9 @@ class RVDBTExec(BaseExec):
 
 
 class Benchmark:
-    def __init__(self, root, args, cmp_out=False, ofile=None):
+    def __init__(self, root, args, cmp_out=False, ofile=None, name=None):
+        self.name = name
+        if self.name is None:
         self.root = root
         self.args = args
         self.cmp_out = cmp_out
@@ -194,14 +211,30 @@ def GetBenchmarks_Coremark(prebuilts_dir):
         root + "/", ["coremark.exe", "0x0", "0x0", "0x66", "15000", "7", "1", "2000"]))
     return b
 
+# rv32emu workload
+def GetBenchmarks_RV32EMU(prebuilts_dir):
+    b: list[Benchmark] = []
+    root = os.path.join(prebuilts_dir + "/rv32emu-workload")
+    b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
+    b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
+    b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
+    b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
+    b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
+    b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
+    b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
+    b.append(Benchmark(root + "/", ["dhrystone"]))
+    b.append(Benchmark(root + "/", ["primes"]))
+    b.append(Benchmark(root + "/", ["sha512"]))
+    return b
 
 def GetBenchmarks(opts):
     benchmarks: list[Benchmark] = []
-    benchmarks += GetBenchmarks_Automotive(opts.prebuilts_dir)
+    # benchmarks += GetBenchmarks_Automotive(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Network(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Security(opts.prebuilts_dir)
-    benchmarks += GetBenchmarks_Telecomm(opts.prebuilts_dir)
+    # benchmarks += GetBenchmarks_Telecomm(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Coremark(opts.prebuilts_dir)
+    benchmarks += GetBenchmarks_RV32EMU(opts.prebuilts_dir)
     return benchmarks
 
 
@@ -217,8 +250,9 @@ def compile_benchmark(gcc_path: str, root_dir: str, target: str) -> bool:
         bool: True if compilation succeeded
     """
     # Common flags including standard headers
-    # if os.path.exists(f"{root_dir}/{target}"):
-    #     return True
+    if os.path.exists(f"{root_dir}/{target}"):
+        print(f"Executable of workload {root_dir}/{target} already exists, skip loading and jump into running")
+        return True
     # Temp avoid
     common_flags = "-Wno-implicit-int -Wno-implicit-function-declaration"
     # temporarily just do not compile here to avoid mistracking compilation flags
@@ -269,21 +303,24 @@ def compile_benchmark(gcc_path: str, root_dir: str, target: str) -> bool:
 def RunTests(opts):
     benchmarks = GetBenchmarks(opts)
 
-    def get_execs(): return [QEMUExec(), RVDBTExec(
-        False), RVDBTExec(True, False), RVDBTExec(True, True)]
+    def get_execs(): return [
+        QEMUExec(), 
+        # RVDBTExec(False), # jit
+        # RVDBTExec(True, False), # qcgaot
+        # RVDBTExec(True, True), # llvmaot
+        LIBRISCVExec()]
 
-    csvtab = [["tab"] + list(map(lambda e: e.name, get_execs()))]
+    csvtab = [["benchmark-name"] + list(map(lambda e: e.name, get_execs()))]
 
     for b in benchmarks:
-        print(f"\nCompiling benchmark: {b.root} {' '.join(b.args)}")
+        print(f"\nCompiling benchmark under: {b.root}")
         if not compile_benchmark(opts.riscv32_gcc, b.root, b.args[0]):
             print(f"Skipping benchmark due to compilation failure: {b.root}")
             continue
 
-        print(f"\nRunning benchmark: {b.root} {' '.join(b.args)}")
-        scores = [b.root.removeprefix(opts.prebuilts_dir)]
-
+        print(f"\nRunning benchmark:")
         execs = get_execs()
+        scores = [b.name]
         ref_exec = execs[0]
         for e in execs:
             print(f"\nExecuting with {e.name}:")
