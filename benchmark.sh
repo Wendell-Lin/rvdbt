@@ -1,4 +1,5 @@
 python3 examples/benchmarks.py \
-    --build-dir $(pwd)/build \
+    --rvdbt-build-dir $(pwd)/build \
+    --libriscv-build-dir /home/wendell/libriscv/emulator \
     --prebuilts $(pwd)/prebuilts \
     --riscv32-gcc riscv32-unknown-elf-gcc

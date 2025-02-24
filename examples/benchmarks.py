@@ -44,16 +44,46 @@ class QEMUExec(BaseExec):
         self.time = timer
 
 class LIBRISCVExec(BaseExec):
-    bin_path = "rvlinux"
+    build_dir = None
 
-    def __init__(self):
-        self.name = "libriscv"
+    def __init__(self, mode):
+        super().__init__()
+        # mode: "interp" (interpreter) or "bt" (binary translation)
+        self.name = f"rvlinux-{mode}"
+        self.mode = mode
+
+    def setup(self, root, cmd):
+        super().setup(root, cmd)
+        # No setup needed for interpreter mode
+        if self.mode == "interp":
+            self.setup_ok = True
+            return
+        
+        # Setup environment for binary translation mode
+        env = os.environ.copy()
+        
+        # Run setup compilation if needed
+        pargs = [LIBRISCVExec.build_dir + "/rvlinux", self.root + "/" + self.args[0]]
+        p = subprocess.Popen(pargs, cwd=LIBRISCVExec.build_dir,
+                           env=env,
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE)
+        self.out, self.err = p.communicate()
+        self.rc = p.returncode
+        self.setup_ok = self.rc == 0
 
     def run(self):
-        pargs = [LIBRISCVExec.bin_path] + self.args
+        pargs = [LIBRISCVExec.build_dir + "/rvlinux"] + self.args
+        env = os.environ.copy()
+        
+        if self.mode == "interp":
+            pargs.append("--no-translate")
+        
         timer = time.time()
         p = subprocess.Popen(pargs, cwd=self.root,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                           env=env,
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE)
         self.out, self.err = p.communicate()
         timer = time.time() - timer
         self.rc = p.returncode
@@ -106,6 +136,7 @@ class Benchmark:
     def __init__(self, root, args, cmp_out=False, ofile=None, name=None):
         self.name = name
         if self.name is None:
+            self.name = args[0]
         self.root = root
         self.args = args
         self.cmp_out = cmp_out
@@ -227,6 +258,22 @@ def GetBenchmarks_RV32EMU(prebuilts_dir):
     b.append(Benchmark(root + "/", ["sha512"]))
     return b
 
+# rv32emu workload, but compiled with rv32ia
+def GetBenchmarks_RV32IA(prebuilts_dir):
+    b: list[Benchmark] = []
+    root = os.path.join(prebuilts_dir + "/rv32ia")
+    b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
+    b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
+    b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
+    b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
+    b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
+    b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
+    b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
+    b.append(Benchmark(root + "/", ["dhrystone"]))
+    b.append(Benchmark(root + "/", ["primes"]))
+    b.append(Benchmark(root + "/", ["sha512"]))
+    return b
+
 def GetBenchmarks(opts):
     benchmarks: list[Benchmark] = []
     # benchmarks += GetBenchmarks_Automotive(opts.prebuilts_dir)
@@ -234,7 +281,8 @@ def GetBenchmarks(opts):
     # benchmarks += GetBenchmarks_Security(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Telecomm(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Coremark(opts.prebuilts_dir)
-    benchmarks += GetBenchmarks_RV32EMU(opts.prebuilts_dir)
+    # benchmarks += GetBenchmarks_RV32EMU(opts.prebuilts_dir)
+    benchmarks += GetBenchmarks_RV32IA(opts.prebuilts_dir)
     return benchmarks
 
 
@@ -251,7 +299,7 @@ def compile_benchmark(gcc_path: str, root_dir: str, target: str) -> bool:
     """
     # Common flags including standard headers
     if os.path.exists(f"{root_dir}/{target}"):
-        print(f"Executable of workload {root_dir}/{target} already exists, skip loading and jump into running")
+        print(f"Executable of workload {root_dir}/{target} already exists, skip compiling and jump into execution")
         return True
     # Temp avoid
     common_flags = "-Wno-implicit-int -Wno-implicit-function-declaration"
@@ -304,11 +352,13 @@ def RunTests(opts):
     benchmarks = GetBenchmarks(opts)
 
     def get_execs(): return [
-        QEMUExec(), 
-        # RVDBTExec(False), # jit
-        # RVDBTExec(True, False), # qcgaot
-        # RVDBTExec(True, True), # llvmaot
-        LIBRISCVExec()]
+        QEMUExec(),
+        RVDBTExec(False), # qcgaot
+        RVDBTExec(True, False), # qcgaot
+        RVDBTExec(True, True), # llvmaot
+        # LIBRISCVExec("interp"), # interpreter mode
+        LIBRISCVExec("bt"),     # binary translation mode
+    ]
 
     csvtab = [["benchmark-name"] + list(map(lambda e: e.name, get_execs()))]
 
@@ -341,15 +391,16 @@ def RunTests(opts):
 def main():
     op = optparse.OptionParser()
     op.add_option("--riscv32-gcc", dest="riscv32_gcc")
-    op.add_option("--build-dir", dest="build_dir")
+    op.add_option("--rvdbt-build-dir", dest="rvdbt_build_dir")
+    op.add_option("--libriscv-build-dir", dest="libriscv_build_dir")
     op.add_option("--prebuilts", dest="prebuilts_dir")
 
     (opts, args) = op.parse_args()
-    if not opts.build_dir or not opts.prebuilts_dir:
+    if not opts.rvdbt_build_dir or not opts.libriscv_build_dir or not opts.prebuilts_dir:
         op.error("usage")
 
-    RVDBTExec.build_dir = opts.build_dir
-
+    RVDBTExec.build_dir = opts.rvdbt_build_dir
+    LIBRISCVExec.build_dir = opts.libriscv_build_dir
     RunTests(opts)
 
 
