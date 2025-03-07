@@ -21,14 +21,6 @@ pipeline {
                 sh './scripts/test.sh 19'
             }
         }
-       
-        stage('Benchmark') {
-            steps {
-                echo 'Run benchmarks'
-                sh 'chmod +x ./scripts/benchmark.sh'
-                sh './scripts/benchmark.sh 19'
-            }
-        } 
     }
     post {
         success {
