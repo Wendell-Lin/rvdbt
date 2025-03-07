@@ -10,7 +10,7 @@ pipeline {
                 echo 'Build the project'
                 sh 'git submodule update --init --recursive'
                 sh 'chmod +x ./scripts/build.sh'
-                sh './scripts/build.sh 15'
+                sh './scripts/build.sh 19'
             }
         }
 
@@ -18,7 +18,7 @@ pipeline {
             steps {
                 echo 'Run tests'
                 sh 'chmod +x ./scripts/test.sh'
-                sh './scripts/test.sh 15'
+                sh './scripts/test.sh 19'
             }
         }
 
@@ -26,7 +26,7 @@ pipeline {
             steps {
                 echo 'Run benchmarks'
                 sh 'chmod +x ./scripts/benchmark.sh'
-                sh './scripts/benchmark.sh 15'
+                sh './scripts/benchmark.sh 19'
             }
         }
     }
