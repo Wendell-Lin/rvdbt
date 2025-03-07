@@ -18,10 +18,13 @@ class BaseExec:
         self.out = None
         self.err = None
         self.time = None
-
+ 
     def setup(self, root, cmd):
         self.root = root
         self.args = cmd
+    
+    def print_dir(self):
+        print(f"Under {self.root}")
 
     def run(self):
         pass
@@ -35,6 +38,8 @@ class QEMUExec(BaseExec):
 
     def run(self):
         pargs = [QEMUExec.bin_path] + self.args
+        self.print_dir()
+        print(f"{" ".join(pargs)}")
         timer = time.time()
         p = subprocess.Popen(pargs, cwd=self.root,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -42,6 +47,11 @@ class QEMUExec(BaseExec):
         timer = time.time() - timer
         self.rc = p.returncode
         self.time = timer
+        
+        # Store output if ofile is set
+        if hasattr(self, 'ofile') and self.ofile:
+            with open(self.ofile, 'wb') as f:
+                f.write(self.out)
 
 class LIBRISCVExec(BaseExec):
     build_dir = None
@@ -64,6 +74,7 @@ class LIBRISCVExec(BaseExec):
         
         # Run setup compilation if needed
         pargs = [LIBRISCVExec.build_dir + "/rvlinux", self.root + "/" + self.args[0]]
+        self.bin_path = LIBRISCVExec.build_dir + "/rvlinux"
         p = subprocess.Popen(pargs, cwd=LIBRISCVExec.build_dir,
                            env=env,
                            stdout=subprocess.PIPE,
@@ -74,6 +85,8 @@ class LIBRISCVExec(BaseExec):
 
     def run(self):
         pargs = [LIBRISCVExec.build_dir + "/rvlinux"] + self.args
+        self.print_dir()
+        print(f"{" ".join(pargs)}")
         env = os.environ.copy()
         
         if self.mode == "interp":
@@ -104,11 +117,11 @@ class RVDBTExec(BaseExec):
             self.setup_ok = True
             return
         # make sure dbtcache exists
-        os.makedirs(RVDBTExec.build_dir + "/dbtcache", exist_ok=True)
         pargs = [RVDBTExec.build_dir + "/bin/elfaot",
                  "--cache=dbtcache",
                  "--llvm=" + ("off", "on")[self.llvm],
                  "--elf=" + self.root + "/" + self.args[0]]
+        print(f"Setup command: {self.root}${" ".join(pargs)}")
         p = subprocess.Popen(pargs, cwd=RVDBTExec.build_dir,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.out, self.err = p.communicate()
@@ -123,6 +136,8 @@ class RVDBTExec(BaseExec):
                  "--fsroot=" + self.root]
         pargs += ["--aot=" + ("off", "on")[self.aot]]
         pargs += ["--"] + self.args
+        self.print_dir()
+        print(f"{" ".join(pargs)}")
         timer = time.time()
         p = subprocess.Popen(pargs, cwd=RVDBTExec.build_dir,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -139,15 +154,20 @@ class Benchmark:
             self.name = args[0]
         self.root = root
         self.args = args
-        self.cmp_out = cmp_out
+        self.cmp_out = cmp_out  
         self.ofile = self.root + "/" + ofile if ofile is not None else None
 
     def get_ofile(self, exec):
         assert (self.ofile is not None)
         return self.ofile + "." + exec.name
+    
+    def set_ofile(self, ofile):
+        self.ofile = self.root + "/" + ofile
 
     def launch_with(self, exec: BaseExec):
         exec.setup(self.root, self.args)
+        if self.ofile:
+            exec.ofile = self.ofile
         exec.run()
         if self.ofile is not None and os.path.isfile(self.ofile):
             os.rename(self.ofile, self.get_ofile(exec))
@@ -169,7 +189,7 @@ class Benchmark:
         return None
 
     class Result:
-        def __init__(self, res, time, score):
+        def __init__(self, res, time, score, output=None):
             self.res = res
             self.time = time
             self.score = score
@@ -270,8 +290,8 @@ def GetBenchmarks_RV32IA(prebuilts_dir):
     b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
     b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
     b.append(Benchmark(root + "/", ["dhrystone"]))
-    b.append(Benchmark(root + "/", ["primes"]))
-    b.append(Benchmark(root + "/", ["sha512"]))
+    b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
+    b.append(Benchmark(root + "/", ["sha512"], cmp_out=True))
     return b
 
 def GetBenchmarks(opts):
@@ -298,6 +318,8 @@ def compile_benchmark(gcc_path: str, root_dir: str, target: str) -> bool:
         bool: True if compilation succeeded
     """
     # Common flags including standard headers
+    # TODO: we should compile before benchmark here, so maybe just check exist
+    #       then run and remove the nasty code below.
     if os.path.exists(f"{root_dir}/{target}"):
         print(f"Executable of workload {root_dir}/{target} already exists, skip compiling and jump into execution")
         return True
@@ -351,14 +373,21 @@ def compile_benchmark(gcc_path: str, root_dir: str, target: str) -> bool:
 def RunTests(opts):
     benchmarks = GetBenchmarks(opts)
 
-    def get_execs(): return [
-        QEMUExec(),
-        RVDBTExec(False), # qcgaot
-        RVDBTExec(True, False), # qcgaot
-        RVDBTExec(True, True), # llvmaot
-        # LIBRISCVExec("interp"), # interpreter mode
-        LIBRISCVExec("bt"),     # binary translation mode
-    ]
+    # Modified to use opts
+    def get_execs(): 
+        execs = [QEMUExec()]  # QEMU is always included as reference
+        if opts.rvdbt_jit:
+            execs.append(RVDBTExec(False))  # JIT mode
+        if opts.rvdbt_qcgaot:
+            execs.append(RVDBTExec(True, False))  # QCG AOT
+        if opts.rvdbt_llvmaot:
+            execs.append(RVDBTExec(True, True))  # LLVM AOT
+        if opts.libriscv:
+            execs.append(LIBRISCVExec("bt"))  # LibRISCV BT mode
+        return execs
+    
+    if opts.objective == "test":
+        benchmarks = [b for b in benchmarks if b.cmp_out]
 
     csvtab = [["benchmark-name"] + list(map(lambda e: e.name, get_execs()))]
 
@@ -373,7 +402,7 @@ def RunTests(opts):
         scores = [b.name]
         ref_exec = execs[0]
         for e in execs:
-            print(f"\nExecuting with {e.name}:")
+            print(f"Running {b.name} with {e.name}")
             b.launch_with(e)
             res = b.result(e, ref_exec)
             print(f"  Result: {res.res}")
@@ -394,10 +423,21 @@ def main():
     op.add_option("--rvdbt-build-dir", dest="rvdbt_build_dir")
     op.add_option("--libriscv-build-dir", dest="libriscv_build_dir")
     op.add_option("--prebuilts", dest="prebuilts_dir")
+    # Add new options for execution modes
+    op.add_option("--rvdbt-jit", action="store_true", dest="rvdbt_jit", default=False)
+    op.add_option("--rvdbt-qcgaot", action="store_true", dest="rvdbt_qcgaot", default=False)
+    op.add_option("--rvdbt-llvmaot", action="store_true", dest="rvdbt_llvmaot", default=False)
+    op.add_option("--libriscv", action="store_true", dest="libriscv", default=False)
+    # set objective to "benchmark" or "test"
+    op.add_option("--objective", dest="objective", type="choice", 
+                 choices=["benchmark", "test"], default="benchmark",
+                 help="Set the objective: 'benchmark' or 'test'")
 
     (opts, args) = op.parse_args()
     if not opts.rvdbt_build_dir or not opts.libriscv_build_dir or not opts.prebuilts_dir:
         op.error("usage")
+    os.makedirs(opts.rvdbt_build_dir + "/dbtcache", exist_ok=True)
+    os.makedirs('logs', exist_ok=True)
 
     RVDBTExec.build_dir = opts.rvdbt_build_dir
     LIBRISCVExec.build_dir = opts.libriscv_build_dir

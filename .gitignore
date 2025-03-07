@@ -4,4 +4,5 @@
 *build*/
 *prebuilts*/
 *venv*/
+*logs*/
 compile_commands.json
