@@ -5,6 +5,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Build the project'
+                sh 'git submodule update --init --recursive'
                 sh 'chmod +x ./scripts/build.sh'
                 sh './scripts/build.sh 15'
             }
