@@ -61,7 +61,10 @@ target_include_directories(dbtstatic SYSTEM PUBLIC "${PROJECT_SOURCE_DIR}/dbt/th
 
 target_link_libraries(dbtstatic PUBLIC dbtjitshared asmjit::asmjit ${Boost_LIBRARIES} m md ssl crypto)
 
-find_package(LLVM 15 REQUIRED CONFIG)
+# if major version is defined, find the specific path
+set(LLVM_DIR ${LLVM_PATH}/lib/cmake/llvm)
+find_package(LLVM REQUIRED CONFIG)
+
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 

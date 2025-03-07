@@ -2,7 +2,7 @@
 .cache
 .idea
 *build*/
-*prebuilts*/
+# *prebuilts*/
 *venv*/
 *logs*/
 compile_commands.json
