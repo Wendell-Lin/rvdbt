@@ -10,7 +10,7 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Host.h"
+#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetIntrinsicInfo.h"
@@ -114,19 +114,15 @@ static llvm::TargetMachine *GetAOTTargetMachine()
 
 		llvm::SubtargetFeatures features;
 		{
-			llvm::StringMap<bool> features_map;
-			if (llvm::sys::getHostCPUFeatures(features_map)) {
-				for (const auto &f : features_map) {
-					features.AddFeature(f.first(), f.second);
-				}
-			}
+			for (const auto &[Feature, Enabled] : llvm::sys::getHostCPUFeatures())
+				features.AddFeature(Feature, Enabled);
 		}
 
 		llvm::TargetOptions opt;
 		auto RM = llvm::Reloc::Model(llvm::Reloc::PIC_);
 		auto host_cpu = llvm::sys::getHostCPUName();
 		return target->createTargetMachine(ttriple, host_cpu, features.getString(), opt, RM, {},
-						   llvm::CodeGenOpt::Aggressive);
+						   llvm::CodeGenOptLevel::Aggressive);
 	})();
 
 	return machine;
@@ -148,7 +144,7 @@ static void GenerateObjectFile(llvm::Module *cmodule, std::string const &filenam
 	}
 
 	llvm::legacy::PassManager pass;
-	auto FileType = llvm::CGFT_ObjectFile;
+	auto FileType = llvm::CodeGenFileType::ObjectFile;
 
 	if (tmachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
 		llvm::errs() << "emit objfile failed";

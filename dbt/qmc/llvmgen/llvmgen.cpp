@@ -8,7 +8,7 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Verifier.h"
-#include <llvm-15/llvm/IR/IntrinsicInst.h>
+#include "llvm/IR/IntrinsicInst.h"
 
 namespace std
 {
@@ -43,7 +43,7 @@ LLVMGenCtx::LLVMGenCtx(llvm::Module *cmodule_) : ctx(g_llvm_ctx), cmodule(*cmodu
 {
 	auto voidty = llvm::Type::getVoidTy(ctx);
 	auto ptrty = llvm::PointerType::get(ctx, 0);
-	auto i8ptrty = llvm::Type::getInt8PtrTy(ctx);
+	auto i8ptrty = llvm::PointerType::getUnqual(ctx);
 	auto i32ty = llvm::Type::getInt32Ty(ctx);
 
 	qcg_fnty = llvm::FunctionType::get(voidty, {i8ptrty, i8ptrty}, false);
@@ -92,7 +92,7 @@ void LLVMGen::ExpandIntrinsics(bool is_final)
 	auto lirb = llvm::IRBuilder<>(lctx);
 	lb = &lirb;
 
-	for (auto &bb : func->getBasicBlockList()) {
+	for (auto &bb : *func) {
 		for (auto iit = bb.begin(); iit != bb.end(); ++iit) {
 			if (!llvm::isa<llvm::CallInst>(&*iit)) {
 				continue;
@@ -401,11 +401,11 @@ llvm::PointerType *QIRToLLVM::MakePtrType(VType type)
 {
 	switch (type) {
 	case VType::I8:
-		return llvm::Type::getInt8PtrTy(lctx);
+		return llvm::PointerType::getUnqual(lctx);
 	case VType::I16:
-		return llvm::Type::getInt16PtrTy(lctx);
+		return llvm::PointerType::getUnqual(lctx);
 	case VType::I32:
-		return llvm::Type::getInt32PtrTy(lctx);
+		return llvm::PointerType::getUnqual(lctx);
 	default:
 		unreachable("");
 	}
@@ -497,7 +497,7 @@ llvm::BasicBlock *QIRToLLVM::MapBB(Block *bb)
 
 void QIRToLLVM::EmitTrace()
 {
-	auto qcg_trace_type = llvm::FunctionType::get(lb->getVoidTy(), {lb->getInt8PtrTy()}, false);
+	auto qcg_trace_type = llvm::FunctionType::get(lb->getVoidTy(), {lb->getPtrTy()}, false);
 	lb->CreateCall(qcg_trace_type, MakeRStub(RuntimeStubId::id_trace, qcg_trace_type), {statev});
 }
 
