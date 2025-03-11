@@ -43,7 +43,8 @@ LLVMGenCtx::LLVMGenCtx(llvm::Module *cmodule_) : ctx(g_llvm_ctx), cmodule(*cmodu
 {
 	auto voidty = llvm::Type::getVoidTy(ctx);
 	auto ptrty = llvm::PointerType::get(ctx, 0);
-	auto i8ptrty = llvm::PointerType::getUnqual(ctx);
+	auto i8ty = llvm::Type::getInt8Ty(ctx);
+	auto i8ptrty = llvm::PointerType::getUnqual(i8ty);
 	auto i32ty = llvm::Type::getInt32Ty(ctx);
 
 	qcg_fnty = llvm::FunctionType::get(voidty, {i8ptrty, i8ptrty}, false);
@@ -401,11 +402,11 @@ llvm::PointerType *QIRToLLVM::MakePtrType(VType type)
 {
 	switch (type) {
 	case VType::I8:
-		return llvm::PointerType::getUnqual(lctx);
+		return llvm::PointerType::getUnqual(llvm::Type::getInt8Ty(lctx));
 	case VType::I16:
-		return llvm::PointerType::getUnqual(lctx);
+		return llvm::PointerType::getUnqual(llvm::Type::getInt16Ty(lctx));
 	case VType::I32:
-		return llvm::PointerType::getUnqual(lctx);
+		return llvm::PointerType::getUnqual(llvm::Type::getInt32Ty(lctx));
 	default:
 		unreachable("");
 	}
