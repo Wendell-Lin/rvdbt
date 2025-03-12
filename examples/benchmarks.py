@@ -296,10 +296,10 @@ def GetBenchmarks_RV32IA(prebuilts_dir):
 
 def GetBenchmarks(opts):
     benchmarks: list[Benchmark] = []
-    # benchmarks += GetBenchmarks_Automotive(opts.prebuilts_dir)
+    benchmarks += GetBenchmarks_Automotive(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Network(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Security(opts.prebuilts_dir)
-    # benchmarks += GetBenchmarks_Telecomm(opts.prebuilts_dir)
+    benchmarks += GetBenchmarks_Telecomm(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Coremark(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_RV32EMU(opts.prebuilts_dir)
     benchmarks += GetBenchmarks_RV32IA(opts.prebuilts_dir)
