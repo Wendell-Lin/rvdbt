@@ -447,4 +447,52 @@ void QEmit::Emit_sll(qir::InstBinop *ins)
 	EmitInstBinop<asmjit::x86::Inst::kIdShl>(ins);
 }
 
+// Regular multiplication (lower word)
+void QEmit::Emit_mul(qir::InstBinop *ins)
+{
+	Panic("mul");
+}
+
+// Signed high multiplication
+void QEmit::Emit_mulh(qir::InstBinop *ins)
+{
+	Panic("mulh");
+}
+
+// Mixed signed/unsigned high multiplication
+void QEmit::Emit_mulhsu(qir::InstBinop *ins)
+{
+	Panic("mulhsu");
+}
+
+// Unsigned high multiplication
+void QEmit::Emit_mulhu(qir::InstBinop *ins)
+{
+	Panic("mulhu");
+}
+
+// Signed division
+void QEmit::Emit_div(qir::InstBinop *ins)
+{
+	Panic("div");
+}
+
+// Unsigned division
+void QEmit::Emit_divu(qir::InstBinop *ins)
+{
+	Panic("divu");
+}
+
+// Signed remainder
+void QEmit::Emit_rem(qir::InstBinop *ins)
+{
+	Panic("rem");
+}
+
+// Unsigned remainder
+void QEmit::Emit_remu(qir::InstBinop *ins)
+{
+	Panic("remu");
+}
+
 } // namespace dbt::qcg

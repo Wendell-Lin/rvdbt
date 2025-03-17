@@ -108,30 +108,76 @@ struct Decoder {
 					OP(add);
 				case 0b0100000:
 					OP(sub);
+				case 0b0000001:
+					OP(mul);
 				default:
 					OP_ILL;
 				}
 			case 0b001:
-				OP(sll);
+				switch (in.funct7()) {
+				case 0b0000000:
+					OP(sll);
+				case 0b0000001:
+					OP(mulh);
+				default:
+					OP_ILL;
+				}
 			case 0b010:
-				OP(slt);
+				switch (in.funct7()) {
+				case 0b0000000:
+					OP(slt);
+				case 0b0000001:
+					OP(mulhsu);
+				default:
+					OP_ILL;
+				}
 			case 0b011:
-				OP(sltu);
+				switch (in.funct7()) {
+				case 0b0000000:
+					OP(sltu);
+				case 0b0000001:
+					OP(mulhu);
+				default:
+					OP_ILL;
+				}
 			case 0b100:
-				OP(xor);
+				switch (in.funct7()) {
+				case 0b0000000:
+					OP(xor);
+				case 0b0000001:
+					OP(div);
+				default:
+					OP_ILL;
+				}
 			case 0b101:
 				switch (in.funct7()) {
 				case 0b0000000:
 					OP(srl);
 				case 0b0100000:
 					OP(sra);
+				case 0b0000001:
+					OP(divu);
 				default:
 					OP_ILL;
 				}
 			case 0b110:
-				OP(or);
+				switch (in.funct7()) {
+				case 0b0000000:
+					OP(or);
+				case 0b0000001:
+					OP(rem);
+				default:
+					OP_ILL;
+				}
 			case 0b111:
-				OP(and);
+				switch (in.funct7()) {
+				case 0b0000000:
+					OP(and);
+				case 0b0000001:
+					OP(remu);
+				default:
+					OP_ILL;
+				}
 			default:
 				OP_ILL;
 			}

@@ -263,6 +263,45 @@ HANDLER(amomaxuw)
 	ApplyInsnA<decltype(h)>(s, vmem, i);
 }
 
+HANDLER(mul)
+{
+	// Lower 32 bits of signed multiplication
+	InsnNotImplemented(i, "mul");
+	s->gpr[i.rd()] = (u32)((i64)s->gpr[i.rs1()] * (i64)s->gpr[i.rs2()]);
+
+}
+HANDLER(mulh)
+{
+	// Upper 32 bits of signed × signed
+	s->gpr[i.rd()] = (u32)(((i64)s->gpr[i.rs1()] * (i64)s->gpr[i.rs2()]) >> 32);
+}
+HANDLER(mulhsu)
+{
+	// Upper 32 bits of signed × unsigned
+	s->gpr[i.rd()] = (u32)(((i64)s->gpr[i.rs1()] * (u64)s->gpr[i.rs2()]) >> 32);
+}
+HANDLER(mulhu)
+{
+	// Upper 32 bits of unsigned × unsigned
+	s->gpr[i.rd()] = (u32)(((u64)s->gpr[i.rs1()] * (u64)s->gpr[i.rs2()]) >> 32);
+}
+HANDLER(div) 
+{
+	s->gpr[i.rd()] = (i32)s->gpr[i.rs1()] / (i32)s->gpr[i.rs2()];
+}
+HANDLER(divu)
+{
+	s->gpr[i.rd()] = (u32)s->gpr[i.rs1()] / (u32)s->gpr[i.rs2()];
+}
+HANDLER(rem)
+{
+	s->gpr[i.rd()] = (i32)s->gpr[i.rs1()] % (i32)s->gpr[i.rs2()];
+}
+HANDLER(remu)
+{
+	s->gpr[i.rd()] = (u32)s->gpr[i.rs1()] % (u32)s->gpr[i.rs2()];
+}
+
 void Interpreter::Execute(CPUState *state)
 {
 	u8 *vmem = mmu::base;

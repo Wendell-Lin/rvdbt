@@ -710,4 +710,60 @@ void QIRToLLVM::Emit_sll(qir::InstBinop *ins)
 	EmitBinop(llvm::Instruction::BinaryOps::Shl, ins);
 }
 
+void QIRToLLVM::Emit_mul(qir::InstBinop *ins)
+{
+	EmitBinop(llvm::Instruction::BinaryOps::Mul, ins);
+}
+
+void QIRToLLVM::Emit_mulh(qir::InstBinop *ins)
+{
+	// Sign extend both operands to 64-bit
+	auto op1 = lb->CreateSExt(LoadVOperand(ins->i(0)), lb->getInt64Ty());
+	auto op2 = lb->CreateSExt(LoadVOperand(ins->i(1)), lb->getInt64Ty());
+	// Multiply the 64-bit values
+	auto res = lb->CreateMul(op1, op2);
+	// Shift right and truncate back to 32-bit
+	auto shifted = lb->CreateAShr(res, lb->getInt64(32));
+	StoreVOperand(ins->o(0), lb->CreateTrunc(shifted, lb->getInt32Ty()));
+}
+
+void QIRToLLVM::Emit_mulhsu(qir::InstBinop *ins)
+{
+	// Sign extend first operand, zero extend second operand
+	auto op1 = lb->CreateSExt(LoadVOperand(ins->i(0)), lb->getInt64Ty());
+	auto op2 = lb->CreateZExt(LoadVOperand(ins->i(1)), lb->getInt64Ty());
+	auto res = lb->CreateMul(op1, op2);
+	auto shifted = lb->CreateAShr(res, lb->getInt64(32));
+	StoreVOperand(ins->o(0), lb->CreateTrunc(shifted, lb->getInt32Ty()));
+}
+
+void QIRToLLVM::Emit_mulhu(qir::InstBinop *ins)
+{
+	// Zero extend both operands
+	auto op1 = lb->CreateZExt(LoadVOperand(ins->i(0)), lb->getInt64Ty());
+	auto op2 = lb->CreateZExt(LoadVOperand(ins->i(1)), lb->getInt64Ty());
+	auto res = lb->CreateMul(op1, op2);
+	auto shifted = lb->CreateLShr(res, lb->getInt64(32));
+	StoreVOperand(ins->o(0), lb->CreateTrunc(shifted, lb->getInt32Ty()));
+}
+
+void QIRToLLVM::Emit_div(qir::InstBinop *ins)
+{
+	EmitBinop(llvm::Instruction::BinaryOps::SDiv, ins);
+}
+
+void QIRToLLVM::Emit_divu(qir::InstBinop *ins)
+{
+	EmitBinop(llvm::Instruction::BinaryOps::UDiv, ins);
+}
+
+void QIRToLLVM::Emit_rem(qir::InstBinop *ins)
+{
+	EmitBinop(llvm::Instruction::BinaryOps::SRem, ins);
+}
+
+void QIRToLLVM::Emit_remu(qir::InstBinop *ins)
+{
+	EmitBinop(llvm::Instruction::BinaryOps::URem, ins);
+}
 } // namespace dbt::qir

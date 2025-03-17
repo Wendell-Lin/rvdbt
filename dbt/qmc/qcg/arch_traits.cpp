@@ -78,6 +78,9 @@ constexpr auto R = ArchTraits::GPR_ALL;
 constexpr auto R8 = ArchTraits::GPR_ALL;
 constexpr auto CX = RegMask(0).Set(ArchTraits::RCX);
 constexpr auto SI = RegMask(0).Set(ArchTraits::RSI);
+constexpr auto AX = RegMask(0).Set(ArchTraits::RAX);
+constexpr auto DX = RegMask(0).Set(ArchTraits::RDX);
+constexpr auto BX = RegMask(0).Set(ArchTraits::RBX);
 }; // namespace RACtGPR
 
 #define GPR(X) RACtGPR::X
@@ -96,6 +99,11 @@ CT(r8_r_rs32) = InstCt<1, 2>::Make({DEF(GPR(R8))}, {DEF(GPR(R)), DEF(GPR(R), IMM
 CT(r_0_rs32) = InstCt<1, 2>::Make({DEF(GPR(R))}, {ALIAS(0), DEF(GPR(R), IMM(S32))});
 CT(r_0_ru32) = InstCt<1, 2>::Make({DEF(GPR(R))}, {ALIAS(0), DEF(GPR(R), IMM(U32))});
 CT(r_0_cxi) = InstCt<1, 2>::Make({DEF(GPR(R))}, {ALIAS(0), DEF(GPR(CX), IMM(ANY))});
+CT(ax_0_bx) = InstCt<1, 2>::Make({DEF(GPR(AX))}, {ALIAS(0), DEF(GPR(BX))});
+CT(dx_ax_bx) = InstCt<1, 2>::Make({DEF(GPR(DX))}, {DEF(GPR(AX)), DEF(GPR(BX))});
+CT(ax_0_cx) = InstCt<1, 2>::Make({DEF(GPR(AX))}, {ALIAS(0), DEF(GPR(CX))});
+CT(dx_ax_cx) = InstCt<1, 2>::Make({DEF(GPR(DX))}, {DEF(GPR(AX)), DEF(GPR(CX))});
+CT(r_r_r) = InstCt<1, 2>::Make({DEF(GPR(R))}, {DEF(GPR(R)), DEF(GPR(R))});
 #undef CT
 
 #undef GPR
@@ -118,8 +126,24 @@ CT(r_0_cxi) = InstCt<1, 2>::Make({DEF(GPR(R))}, {ALIAS(0), DEF(GPR(CX), IMM(ANY)
 	CT(xor, r_0_rs32)                                                                                    \
 	CT(sra, r_0_cxi)                                                                                     \
 	CT(srl, r_0_cxi)                                                                                     \
-	CT(sll, r_0_cxi)
-
+	CT(sll, r_0_cxi)                                                                                     \
+	CT(mul, r_r_r)                                                                                    \
+	CT(mulh, r_r_r)                                                                                    \
+	CT(mulhsu, r_r_r)                                                                                 \
+	CT(mulhu, r_r_r)                                                                                   \
+	CT(div, r_r_r)                                                                                    \
+	CT(divu, r_r_r)                                                                                    \
+	CT(rem, r_r_r)                                                                                    \
+	CT(remu, r_r_r)                                                                                  
+	/* CT(mul, ax_0_bx)                                                                                    \
+	CT(mulh, dx_ax_bx)                                                                                    \
+	CT(mulhsu, dx_ax_bx)                                                                                 \
+	CT(mulhu, dx_ax_bx)                                                                                  \
+	CT(div, ax_0_cx)                                                                                    \
+	CT(divu, ax_0_cx)                                                                                    \
+	CT(rem, dx_ax_cx)                                                                                    \
+	CT(remu, dx_ax_cx)                                                                                  
+	*/
 void ArchTraits::init()
 {
 	[[maybe_unused]] static auto x = []() {

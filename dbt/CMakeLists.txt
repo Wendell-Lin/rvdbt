@@ -3,7 +3,7 @@ add_subdirectory(third_party)
 function(add_dbt_option option_name descr default)
     option(${option_name} "${descr}" ${default})
     if(${option_name})
-        add_compile_definition(${option_name})
+        add_compile_definitions(${option_name})
     endif()
 endfunction()
 

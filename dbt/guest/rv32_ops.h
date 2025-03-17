@@ -55,4 +55,13 @@
 	OP(amominw, A, 0)                                                                                    \
 	OP(amomaxw, A, 0)                                                                                    \
 	OP(amominuw, A, 0)                                                                                   \
-	OP(amomaxuw, A, 0)
+	OP(amomaxuw, A, 0)                                                                                   \
+	/**** RV32M ****/                                                                                    \
+	OP(mul, R, 0)                                                                                        \
+	OP(mulh, R, 0)                                                                                       \
+	OP(mulhsu, R, 0)                                                                                     \
+	OP(mulhu, R, 0)                                                                                      \
+	OP(div, R, 0)                                                                                        \
+	OP(divu, R, 0)                                                                                       \
+	OP(rem, R, 0)                                                                                        \
+	OP(remu, R, 0)

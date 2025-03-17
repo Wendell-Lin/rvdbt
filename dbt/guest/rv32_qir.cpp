@@ -392,4 +392,12 @@ TRANSLATOR_Helper(amomaxw);
 TRANSLATOR_Helper(amominuw);
 TRANSLATOR_Helper(amomaxuw);
 
+TRANSLATOR_ArithmRR(mul, mul);
+TRANSLATOR_ArithmRR(mulh, mulh);
+TRANSLATOR_ArithmRR(mulhsu, mulhsu);
+TRANSLATOR_ArithmRR(mulhu, mulhu);
+TRANSLATOR_ArithmRR(div, div);
+TRANSLATOR_ArithmRR(divu, divu);
+TRANSLATOR_ArithmRR(rem, rem);
+TRANSLATOR_ArithmRR(remu, remu);
 } // namespace dbt::qir::rv32

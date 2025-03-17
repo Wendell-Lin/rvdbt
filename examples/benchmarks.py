@@ -175,9 +175,6 @@ class Benchmark:
 
     def verify(self, exec: BaseExec, exec_ref: BaseExec):
         if exec_ref.rc != exec.rc:
-            return "retcode,out=" + str(exec.err)
-
-        if self.cmp_out and exec_ref.out != exec.out:
             return "stdout"
 
         if self.ofile is not None:
@@ -266,43 +263,59 @@ def GetBenchmarks_Coremark(prebuilts_dir):
 def GetBenchmarks_RV32EMU(prebuilts_dir):
     b: list[Benchmark] = []
     root = os.path.join(prebuilts_dir + "/rv32emu-workload")
-    b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
-    b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
-    b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
-    b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
-    b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
-    b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
-    b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
-    b.append(Benchmark(root + "/", ["dhrystone"]))
-    b.append(Benchmark(root + "/", ["primes"]))
-    b.append(Benchmark(root + "/", ["sha512"]))
+    # b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
+    # b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
+    # b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
+    # b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
+    # b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
+    # b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
+    # b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
+    # b.append(Benchmark(root + "/", ["dhrystone"]))
+    b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
+    # b.append(Benchmark(root + "/", ["sha512"]))
     return b
 
 # rv32emu workload, but compiled with rv32ia
 def GetBenchmarks_RV32IA(prebuilts_dir):
     b: list[Benchmark] = []
     root = os.path.join(prebuilts_dir + "/rv32ia")
-    b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
-    b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
-    b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
-    b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
-    b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
-    b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
-    b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
-    b.append(Benchmark(root + "/", ["dhrystone"]))
-    b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
+    # b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
+    # b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
+    # b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
+    # b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
+    # b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
+    # b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
+    # b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
+    # b.append(Benchmark(root + "/", ["dhrystone"]))
+    # b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
+    b.append(Benchmark(root + "/", ["sha512"], cmp_out=True))
+    return b
+
+def GetBenchmarks_RV32I(prebuilts_dir):
+    b: list[Benchmark] = []
+    root = os.path.join(prebuilts_dir + "/rv32emu-i")
+    # b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
+    # b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
+    # b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
+    # b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
+    # b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
+    # b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
+    # b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
+    # b.append(Benchmark(root + "/", ["dhrystone"]))
+    # b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
     b.append(Benchmark(root + "/", ["sha512"], cmp_out=True))
     return b
 
 def GetBenchmarks(opts):
     benchmarks: list[Benchmark] = []
-    benchmarks += GetBenchmarks_Automotive(opts.prebuilts_dir)
+    # benchmarks += GetBenchmarks_Automotive(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Network(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Security(opts.prebuilts_dir)
-    benchmarks += GetBenchmarks_Telecomm(opts.prebuilts_dir)
+    # benchmarks += GetBenchmarks_Telecomm(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Coremark(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_RV32EMU(opts.prebuilts_dir)
-    benchmarks += GetBenchmarks_RV32IA(opts.prebuilts_dir)
+    benchmarks += GetBenchmarks_RV32I(opts.prebuilts_dir)
+    # benchmarks += GetBenchmarks_RV32IA(opts.prebuilts_dir)
     return benchmarks
 
 

@@ -167,4 +167,12 @@ Analyser(amomaxw) {}
 Analyser(amominuw) {}
 Analyser(amomaxuw) {}
 
+Analyser(mul) {}
+Analyser(mulh) {}
+Analyser(mulhsu) {}
+Analyser(mulhu) {}
+Analyser(div) {}
+Analyser(divu) {}
+Analyser(rem) {}
+Analyser(remu) {}
 } // namespace dbt::rv32

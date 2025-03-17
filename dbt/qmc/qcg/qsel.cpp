@@ -146,6 +146,46 @@ public:
 	{
 		sel->SelectOperands(ins);
 	}
+	// TODO: maybe remove these?
+	void visit_mul(qir::InstBinop *ins)
+	{
+		sel->SelectOperands(ins);
+	}
+
+	void visit_mulh(qir::InstBinop *ins)
+	{
+		sel->SelectOperands(ins);
+	}
+
+	void visit_mulhsu(qir::InstBinop *ins)
+	{
+		sel->SelectOperands(ins);
+	}
+
+	void visit_mulhu(qir::InstBinop *ins)
+	{
+		sel->SelectOperands(ins);
+	}
+	
+	void visit_div(qir::InstBinop *ins)
+	{
+		sel->SelectOperands(ins);
+	}
+	
+	void visit_divu(qir::InstBinop *ins)
+	{
+		sel->SelectOperands(ins);
+	}
+
+	void visit_rem(qir::InstBinop *ins)
+	{
+		sel->SelectOperands(ins);
+	}
+
+	void visit_remu(qir::InstBinop *ins)
+	{
+		sel->SelectOperands(ins);
+	}
 
 private:
 	QSel *sel{};

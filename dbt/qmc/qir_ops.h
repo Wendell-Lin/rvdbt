@@ -23,7 +23,15 @@
 	LEAF(sra, InstBinop, 0)                                                                              \
 	LEAF(srl, InstBinop, 0)                                                                              \
 	LEAF(sll, InstBinop, 0)                                                                              \
-	CLASS(InstBinop, add, sll)
+	LEAF(mul, InstBinop, 0)                                                                              \
+	LEAF(mulh, InstBinop, 0)                                                                             \
+	LEAF(mulhsu, InstBinop, 0)                                                                           \
+	LEAF(mulhu, InstBinop, 0)                                                                            \
+	LEAF(div, InstBinop, 0)                                                                              \
+	LEAF(divu, InstBinop, 0)                                                                             \
+	LEAF(rem, InstBinop, 0)                                                                              \
+	LEAF(remu, InstBinop, 0)                                                                             \
+	CLASS(InstBinop, add, remu)																			 
 
 #define QIR_OPS_LIST(OP) QIR_DEF_LIST(OP, OP, EMPTY_MACRO)
 #define QIR_LEAF_OPS_LIST(LEAF) QIR_DEF_LIST(LEAF, EMPTY_MACRO, EMPTY_MACRO)

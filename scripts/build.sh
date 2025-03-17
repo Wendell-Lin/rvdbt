@@ -8,5 +8,5 @@ CC=clang CXX=clang++ cmake -GNinja -DCMAKE_BUILD_TYPE=Debug \
         -DLLVM_PATH=/usr/lib/llvm-$1 \
         ..
 
-ninja
+ninja -j4
 
