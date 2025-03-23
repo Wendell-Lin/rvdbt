@@ -1,0 +1,60 @@
+diff --git a/isa/Makefile b/isa/Makefile
+index e3b6719..2051a5b 100644
+--- a/isa/Makefile
++++ b/isa/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for riscv-tests/isa
+ #-----------------------------------------------------------------------
+ 
+-XLEN ?= 64
++XLEN ?=32
+ 
+ src_dir := .
+ 
+@@ -24,6 +24,9 @@ include $(src_dir)/rv64mi/Makefrag
+ include $(src_dir)/rv64mzicbo/Makefrag
+ include $(src_dir)/hypervisor/Makefrag
+ endif
++
++# Move rv32ui includes inside an XLEN=32 conditional
++ifeq ($(XLEN),32)
+ include $(src_dir)/rv32ui/Makefrag
+ include $(src_dir)/rv32uc/Makefrag
+ include $(src_dir)/rv32um/Makefrag
+@@ -37,6 +40,7 @@ include $(src_dir)/rv32uzbc/Makefrag
+ include $(src_dir)/rv32uzbs/Makefrag
+ include $(src_dir)/rv32si/Makefrag
+ include $(src_dir)/rv32mi/Makefrag
++endif
+ 
+ default: all
+ 
+@@ -62,7 +66,8 @@ vpath %.S $(src_dir)
+ 	$(RISCV_SIM) --isa=rv64gch_zfh_zicboz_svnapot_zicntr_zba_zbb_zbc_zbs --misaligned $< 2> $@
+ 
+ %.out32: %
+-	$(RISCV_SIM) --isa=rv32gc_zfh_zicboz_svnapot_zicntr_zba_zbb_zbc_zbs --misaligned $< 2> $@
++	$(RISCV_SIM) --isa=rv32i --misaligned $< 2> $@
++# $(RISCV_SIM) --isa=rv32gc_zfh_zicboz_svnapot_zicntr_zba_zbb_zbc_zbs --misaligned $< 2> $@
+ 
+ define compile_template
+ 
+@@ -88,7 +93,8 @@ endif
+ 
+ endef
+ 
+-$(eval $(call compile_template,rv32ui,-march=rv32g -mabi=ilp32))
++ifeq ($(XLEN),32)
++$(eval $(call compile_template,rv32ui,-march=rv32i_zicsr_zifencei_f -mabi=ilp32f))
+ $(eval $(call compile_template,rv32uc,-march=rv32g -mabi=ilp32))
+ $(eval $(call compile_template,rv32um,-march=rv32g -mabi=ilp32))
+ $(eval $(call compile_template,rv32ua,-march=rv32g -mabi=ilp32))
+@@ -101,6 +107,8 @@ $(eval $(call compile_template,rv32uzbc,-march=rv32g_zbc -mabi=ilp32))
+ $(eval $(call compile_template,rv32uzbs,-march=rv32g_zbs -mabi=ilp32))
+ $(eval $(call compile_template,rv32si,-march=rv32g -mabi=ilp32))
+ $(eval $(call compile_template,rv32mi,-march=rv32g -mabi=ilp32))
++endif
++
+ ifeq ($(XLEN),64)
+ $(eval $(call compile_template,rv64ui,-march=rv64g -mabi=lp64))
+ $(eval $(call compile_template,rv64uc,-march=rv64g -mabi=lp64))

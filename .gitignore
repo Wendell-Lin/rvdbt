@@ -6,3 +6,4 @@
 *venv*/
 *logs*/
 compile_commands.json
+logs

@@ -1,5 +1,19 @@
 ## My progress and todo
 https://hackmd.io/iDSBjMJTSTiiBJ8ODpPvTQ?both
+## RISCV-TESTS
+To test prebuilt of `rv32ui` and `rv32um`, run
+```shell
+bash scripts/prebuilts-riscv-tests.sh
+```
+Or to test `rv32ui` and `rv32um` built from `riscv-tests`, patch and run script as follow.
+```shell
+cd riscv-tests
+git apply ../patches/riscv-tests.patch
+cd isa
+make rv32ui rv32um
+cd ../..
+bash scripts/riscv-tests.sh
+```
 ## Originally
 Below are original content from the forked repo.
 ### Design docs: [docs/rvdbt.md](docs/rvdbt.md)
