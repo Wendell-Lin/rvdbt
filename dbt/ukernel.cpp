@@ -551,6 +551,16 @@ static uabi_long linux_clock_gettime64(clockid_t which_clock, uabi__kernel_times
 	return rcerrno(rc);
 }
 
+// static uabi_long linux_gettimeofday(struct timeval __user *tv, struct timezone __user *tz) // tz is obsolete
+// {
+// 	struct timespec tp;
+// 	auto rc = clock_gettime(CLOCK_REALTIME, &tp);
+// 	tv->tv_sec = tp.tv_sec;
+// 	tv->tv_usec = tp.tv_nsec / 1000;
+
+//     return rcerrno(rc);
+// }
+
 } // namespace ukernel_syscall
 
 void ukernel::Syscall(CPUState *state)

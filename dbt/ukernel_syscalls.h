@@ -153,6 +153,7 @@
 	SC(umask, 166)                                                                                       \
 	SC(prctl, 167)                                                                                       \
 	SC(getcpu, 168)                                                                                      \
+	SC(gettimeofday, 169)                                                                                \
 	SC(getpid, 172)                                                                                      \
 	SC(getppid, 173)                                                                                     \
 	SC(getuid, 174)                                                                                      \
