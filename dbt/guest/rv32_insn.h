@@ -128,6 +128,18 @@ protected:
 	static constexpr Flags::Types gen_flags = static_cast<Flags::Types>(Flags::HasRd | Flags::MayTrap);
 };
 
+struct Zicsr : public Base {
+	INSN_FIELD(rd)
+	INSN_FIELD(rs1)
+	INSN_FIELD(zimm)
+	INSN_FIELD(funct3)
+	INSN_FIELD(csr)
+protected:
+	using _funct3 = bf_range<u8, 12, 14>;
+	using _funct7 = bf_range<u8, 25, 31>;
+	using _csr = bf_range<u16, 20, 31>;
+	using _zimm = bf_range<u8, 15, 19>;
+};
 char const *GRPToName(u8 r);
 std::ostream &operator<<(std::ostream &o, Base i);
 std::ostream &operator<<(std::ostream &o, R i);

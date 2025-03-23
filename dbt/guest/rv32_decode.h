@@ -191,18 +191,32 @@ struct Decoder {
 				OP_ILL;
 			}
 		case 0b1110011:
-			switch (in.funct3() | in.rd() | in.rs1()) {
-			case 0:
-				switch (in.funct12()) {
-				case 0b000000000000:
-					OP(ecall);
-				case 0b000000000001:
-					OP(ebreak);
+			switch (in.funct3()) {
+				case 0b000:  // SYSTEM instructions (ecall/ebreak)
+					switch (in.funct12()) {
+						case 0b000000000000:
+							OP(ecall);
+						case 0b000000000001:
+							OP(ebreak);
+						case 0b001100000010:
+							OP(mret);
+						default:
+							OP_ILL;
+					}
+				case 0b001:
+					OP(csrrw);
+				case 0b010:
+					OP(csrrs);
+				case 0b011:
+					OP(csrrc);
+				case 0b101:
+					OP(csrrwi);
+				case 0b110:
+					OP(csrrsi);
+				case 0b111:
+					OP(csrrci);
 				default:
 					OP_ILL;
-				}
-			default:
-				OP_ILL; /* csr* */
 			}
 		case 0b0101111:
 			switch (in.funct3()) {

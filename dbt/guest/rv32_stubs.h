@@ -16,4 +16,19 @@
 	X(rv32_amominw)                                                                                      \
 	X(rv32_amomaxw)                                                                                      \
 	X(rv32_amominuw)                                                                                     \
-	X(rv32_amomaxuw)
+	X(rv32_amomaxuw)                                                                                     \
+	X(rv32_mul)                                                                                          \
+	X(rv32_mulh)                                                                                         \
+	X(rv32_mulhsu)                                                                                       \
+	X(rv32_mulhu)                                                                                        \
+	X(rv32_div)                                                                                          \
+	X(rv32_divu)                                                                                         \
+	X(rv32_rem)                                                                                          \
+	X(rv32_remu)                                                                                         \
+	X(rv32_csrrw)                                                                                        \
+	X(rv32_csrrs)                                                                                        \
+	X(rv32_csrrc)                                                                                        \
+	X(rv32_csrrwi)                                                                                       \
+	X(rv32_csrrsi)                                                                                       \
+	X(rv32_csrrci)                                                                                       \
+	X(rv32_mret)                                                                                         \

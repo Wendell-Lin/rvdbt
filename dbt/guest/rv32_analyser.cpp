@@ -175,4 +175,12 @@ Analyser(div) {}
 Analyser(divu) {}
 Analyser(rem) {}
 Analyser(remu) {}
+Analyser(csrrw) {}
+Analyser(csrrs) {}
+Analyser(csrrc) {}
+Analyser(csrrwi) {}
+Analyser(csrrsi) {}
+Analyser(csrrci) {}
+Analyser(mret) {}
+
 } // namespace dbt::rv32

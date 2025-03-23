@@ -38,6 +38,10 @@ struct CPUStateImpl {
 	RuntimeStubTab stub_tab{};
 
 	uptr sp_unwindptr{};
+
+	using csr_t = u32;
+	static constexpr u16 csr_num = 4096;
+	std::array<csr_t, csr_num> csr{};
 };
 
 // qmc config, also used to synchronize int/jit debug tracing

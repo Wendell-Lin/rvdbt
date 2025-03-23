@@ -64,4 +64,12 @@
 	OP(div, R, 0)                                                                                        \
 	OP(divu, R, 0)                                                                                       \
 	OP(rem, R, 0)                                                                                        \
-	OP(remu, R, 0)
+	OP(remu, R, 0)                                                                                       \
+	/*** RV32Zicsr ***/                                                                                  \
+	OP(csrrw, Zicsr, 0)                                                                                   \
+	OP(csrrs, Zicsr, 0)                                                                                   \
+	OP(csrrc, Zicsr, 0)                                                                                   \
+	OP(csrrwi, Zicsr, 0)                                                                                  \
+	OP(csrrsi, Zicsr, 0)                                                                                  \
+	OP(csrrci, Zicsr, 0)                                                                                   \
+	OP(mret, Base, 0)                                                                                     \

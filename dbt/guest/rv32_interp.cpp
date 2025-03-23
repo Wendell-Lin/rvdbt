@@ -266,19 +266,19 @@ HANDLER(amomaxuw)
 HANDLER(mul)
 {
 	// Lower 32 bits of signed multiplication
-	InsnNotImplemented(i, "mul");
 	s->gpr[i.rd()] = (u32)((i64)s->gpr[i.rs1()] * (i64)s->gpr[i.rs2()]);
 
 }
 HANDLER(mulh)
 {
 	// Upper 32 bits of signed × signed
-	s->gpr[i.rd()] = (u32)(((i64)s->gpr[i.rs1()] * (i64)s->gpr[i.rs2()]) >> 32);
+	// althought the s->gpr is u32, the value it store maybe negative, so we need to cast it to signed int32 first
+	s->gpr[i.rd()] = (u32)(((i64)(i32)s->gpr[i.rs1()] * (i64)(i32)s->gpr[i.rs2()]) >> 32);
 }
 HANDLER(mulhsu)
 {
 	// Upper 32 bits of signed × unsigned
-	s->gpr[i.rd()] = (u32)(((i64)s->gpr[i.rs1()] * (u64)s->gpr[i.rs2()]) >> 32);
+	s->gpr[i.rd()] = (u32)(((i64)(i32)s->gpr[i.rs1()] * s->gpr[i.rs2()]) >> 32);
 }
 HANDLER(mulhu)
 {
@@ -287,19 +287,115 @@ HANDLER(mulhu)
 }
 HANDLER(div) 
 {
-	s->gpr[i.rd()] = (i32)s->gpr[i.rs1()] / (i32)s->gpr[i.rs2()];
+	if (s->gpr[i.rs2()] == 0) {
+		s->gpr[i.rd()] = 0xFFFFFFFF;  // Division by zero
+	} else if ((i32)s->gpr[i.rs1()] == INT32_MIN && (i32)s->gpr[i.rs2()] == -1) {
+		s->gpr[i.rd()] = INT32_MIN;   // Overflow case
+	} else {
+		s->gpr[i.rd()] = (i32)s->gpr[i.rs1()] / (i32)s->gpr[i.rs2()];
+	}
 }
 HANDLER(divu)
 {
-	s->gpr[i.rd()] = (u32)s->gpr[i.rs1()] / (u32)s->gpr[i.rs2()];
+	if (s->gpr[i.rs2()] == 0) {
+		s->gpr[i.rd()] = 0xFFFFFFFF;
+	} else {
+		s->gpr[i.rd()] = s->gpr[i.rs1()] / s->gpr[i.rs2()];
+	}
 }
 HANDLER(rem)
 {
-	s->gpr[i.rd()] = (i32)s->gpr[i.rs1()] % (i32)s->gpr[i.rs2()];
+	if (s->gpr[i.rs2()] == 0) {
+		s->gpr[i.rd()] = s->gpr[i.rs1()];  // Return dividend if divisor is zero
+	} else if ((i32)s->gpr[i.rs1()] == INT32_MIN && (i32)s->gpr[i.rs2()] == -1) {
+		s->gpr[i.rd()] = 0;   // Overflow case
+	} else {
+		s->gpr[i.rd()] = (i32)s->gpr[i.rs1()] % (i32)s->gpr[i.rs2()];
+	}
 }
 HANDLER(remu)
 {
-	s->gpr[i.rd()] = (u32)s->gpr[i.rs1()] % (u32)s->gpr[i.rs2()];
+	if (s->gpr[i.rs2()] == 0) {
+		s->gpr[i.rd()] = s->gpr[i.rs1()];  // Return dividend if divisor is zero
+	} else {
+		s->gpr[i.rd()] = (u32)s->gpr[i.rs1()] % (u32)s->gpr[i.rs2()];
+	}
+}
+HANDLER(csrrw)
+{
+	u16 csr_addr = i.csr();
+	u32 old_value = s->csr[csr_addr];
+	
+	// If rd != x0, read old value
+	if (i.rd() != 0) {
+		s->gpr[i.rd()] = old_value;
+	}
+	
+	// Write new value from rs1
+	s->csr[csr_addr] = s->gpr[i.rs1()];
+}
+HANDLER(csrrs)
+{
+	u16 csr_addr = i.csr();
+	u32 old_value = s->csr[csr_addr];
+	s->gpr[i.rd()] = old_value;  // Always read
+	
+	// Only write if rs1 != x0
+	if (i.rs1() != 0) {
+		// Set bits specified by rs1
+		s->csr[csr_addr] = old_value | s->gpr[i.rs1()];
+	}
+}
+HANDLER(csrrc)
+{
+	u16 csr_addr = i.csr();
+	u32 old_value = s->csr[csr_addr];
+	s->gpr[i.rd()] = old_value;  // Always read
+	
+	// Only write if rs1 != x0
+	if (i.rs1() != 0) {
+		// Clear bits specified by rs1
+		s->csr[csr_addr] = old_value & ~s->gpr[i.rs1()];
+	}
+}
+HANDLER(csrrwi)
+{
+	u16 csr_addr = i.csr();
+	// If rd != x0, read old value
+	if (i.rd() != 0) {
+		s->gpr[i.rd()] = s->csr[csr_addr];
+	}
+	
+	// Write immediate value (zero-extended 5-bit value)
+	s->csr[csr_addr] = i.zimm();  // rs1 field contains the immediate
+}
+HANDLER(csrrsi)
+{
+	u16 csr_addr = i.csr();
+	u32 old_value = s->csr[csr_addr];
+	s->gpr[i.rd()] = old_value;  // Always read
+	
+	// Only write if immediate != 0
+	if (i.zimm() != 0) {  // rs1 field contains the immediate
+		// Set bits specified by immediate
+		s->csr[csr_addr] = old_value | i.zimm();
+	}
+}
+HANDLER(csrrci)
+{
+	u16 csr_addr = i.csr();
+	u32 old_value = s->csr[csr_addr];
+	s->gpr[i.rd()] = old_value;  // Always read
+	
+	// Only write if immediate != 0
+	if (i.zimm() != 0) {  // rs1 field contains the immediate
+		// Clear bits specified by immediate
+		s->csr[csr_addr] = old_value & ~i.zimm();
+	}
+}
+HANDLER(mret)
+{
+	// TODO: real mret implementation
 }
 
 void Interpreter::Execute(CPUState *state)
