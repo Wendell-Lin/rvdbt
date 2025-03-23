@@ -4,3 +4,6 @@
 [submodule "dbt/third_party/elfio"]
 	path = dbt/third_party/elfio
 	url = https://github.com/serge1/ELFIO
+[submodule "riscv-tests"]
+	path = riscv-tests
+	url = https://github.com/riscv-software-src/riscv-tests.git
