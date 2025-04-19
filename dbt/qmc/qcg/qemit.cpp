@@ -1,5 +1,6 @@
 #include "dbt/qmc/qcg/qemit.h"
 #include "dbt/guest/rv32_cpu.h"
+#include "dbt/execute.h"
 
 namespace dbt::qcg
 {
@@ -246,16 +247,21 @@ void QEmit::Emit_gbrind(qir::InstGBrind *ins)
 
 	auto slowpath = j.newLabel();
 	{
+		// commented the original 
 		// Inlined l1_brind_cache lookup
 		auto tmp0 = asmjit::x86::rdi;
 		auto tmp1 = asmjit::x86::rdx;
+		auto tmp2 = asmjit::x86::r12;
+		// auto tmp3 = asmjit::x86::r14;
+		// auto tmp4 = asmjit::x86::r15;
+
 		if (jit_mode) {
 			j.mov(tmp1.r64(), (uptr)tcache::l1_brind_cache.data());
 		} else {
 			j.mov(tmp1.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, l1_brind_cache)));
 		}
 
-		static_assert(sizeof(tcache::BrindCacheEntry) == 1u << 4);
+		// static_assert(sizeof(tcache::BrindCacheEntry) == 1u << 4); // the size has been changed to count number of executions.
 		static_assert(offsetof(tcache::BrindCacheEntry, gip) == 0);
 
 		j.lea(tmp0.r32(), asmjit::x86::ptr(0, ptgt.r64(), 2));
@@ -265,6 +271,13 @@ void QEmit::Emit_gbrind(qir::InstGBrind *ins)
 		j.jne(slowpath);
 
 		FrameDestroy();
+		if (jit_mode) {
+			j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), offsetof(TBlock, flags)));
+			j.inc(asmjit::x86::qword_ptr(tmp2.r64(), 
+				offsetof(TBlock, flags) +      // Offset to flags struct
+				16));                          // Offset to exec_count (after is_brind_target, is_segment_entry)
+		} 
+
 		j.jmp(asmjit::x86::ptr(tmp1.r64(), tmp0.r64(), 0, offsetof(tcache::BrindCacheEntry, code),
 				       sizeof(u64)));
 	}
@@ -308,6 +321,7 @@ static inline asmjit::x86::Mem make_vmem(qir::VOperand vbase)
 
 void QEmit::Emit_vmload(qir::InstVMLoad *ins)
 {
+	// j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(RuntimeStubId::id_trace));
 	auto &vrd = ins->o(0);
 	auto &vbase = ins->i(0);
 	auto sgn = ins->sgn;
@@ -324,6 +338,7 @@ void QEmit::Emit_vmload(qir::InstVMLoad *ins)
 		} else {
 			j.movsx(prd, mem);
 		}
+		mem.addOffset(1);
 		break;
 	case qir::VType::I16:
 		mem.setSize(2);
@@ -332,10 +347,12 @@ void QEmit::Emit_vmload(qir::InstVMLoad *ins)
 		} else {
 			j.movsx(prd, mem);
 		}
+		mem.addOffset(2);
 		break;
 	case qir::VType::I32:
 		mem.setSize(4);
 		j.mov(prd, mem);
+		mem.addOffset(4);
 		break;
 	default:
 		unreachable("");
@@ -344,6 +361,7 @@ void QEmit::Emit_vmload(qir::InstVMLoad *ins)
 
 void QEmit::Emit_vmstore(qir::InstVMStore *ins)
 {
+	// j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(RuntimeStubId::id_trace));
 	auto &vbase = ins->i(0);
 	auto &vdata = ins->i(1);
 
@@ -353,6 +371,72 @@ void QEmit::Emit_vmstore(qir::InstVMStore *ins)
 	assert(ins->sgn == qir::VSign::U);
 	mem.setSize(VTypeToSize(ins->sz));
 	j.emit(asmjit::x86::Inst::kIdMov, mem, pdata);
+	mem.addOffset(VTypeToSize(ins->sz));
+}
+
+void QEmit::Emit_vmload2(qir::InstVMLoad2 *ins)
+{
+	auto prd1 = make_gpr(ins->o(0));
+	auto prd2 = make_gpr(ins->o(1));
+	auto vbase = ins->i(0);
+
+	auto mem = make_vmem(vbase);
+	mem.setSize(8);
+	j.movsd(asmjit::x86::xmm0, mem);
+	j.movd(prd1, asmjit::x86::xmm0);
+	j.pextrd(prd2, asmjit::x86::xmm0, 1);
+}
+
+void QEmit::Emit_vmload4(qir::InstVMLoad4 *ins)
+{
+	auto prd1 = make_gpr(ins->o(0));
+	auto prd2 = make_gpr(ins->o(1));
+	auto prd3 = make_gpr(ins->o(2));
+	auto prd4 = make_gpr(ins->o(3));
+
+	auto mem = make_vmem(ins->i(0));
+	mem.setSize(16);
+	j.movdqu(asmjit::x86::xmm0, mem);
+	j.movd(prd1, asmjit::x86::xmm0);
+	j.pextrd(prd2, asmjit::x86::xmm0, 1);
+	j.pextrd(prd3, asmjit::x86::xmm0, 2);
+	j.pextrd(prd4, asmjit::x86::xmm0, 3);
+}
+
+void QEmit::Emit_vmstore2(qir::InstVMStore2 *ins)
+{
+	auto &vbase = ins->i(0);
+	auto &vdata1 = ins->i(1);
+	auto &vdata2 = ins->i(2);
+
+	auto pdata1 = make_gpr(vdata1);
+	auto pdata2 = make_gpr(vdata2);
+	auto mem = make_vmem(vbase);
+	mem.setSize(8);
+	j.movd(asmjit::x86::xmm0, pdata1);
+	j.pinsrd(asmjit::x86::xmm0, pdata2, 1);
+	j.movsd(mem, asmjit::x86::xmm0);
+}
+
+void QEmit::Emit_vmstore4(qir::InstVMStore4 *ins)
+{
+	auto &vbase = ins->i(0);
+	auto &vdata1 = ins->i(1);
+	auto &vdata2 = ins->i(2);
+	auto &vdata3 = ins->i(3);
+	auto &vdata4 = ins->i(4);
+
+	auto pdata1 = make_gpr(vdata1);
+	auto pdata2 = make_gpr(vdata2);
+	auto pdata3 = make_gpr(vdata3);
+	auto pdata4 = make_gpr(vdata4);
+	auto mem = make_vmem(vbase);
+	mem.setSize(16);
+	j.movd(asmjit::x86::xmm0, pdata1);
+	j.pinsrd(asmjit::x86::xmm0, pdata2, 1);
+	j.pinsrd(asmjit::x86::xmm0, pdata3, 2);
+	j.pinsrd(asmjit::x86::xmm0, pdata4, 3);
+	j.movdqu(mem, asmjit::x86::xmm0);
 }
 
 void QEmit::Emit_setcc(qir::InstSetcc *ins)

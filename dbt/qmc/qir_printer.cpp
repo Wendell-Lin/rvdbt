@@ -180,6 +180,38 @@ public:
 		printOperands(ins);
 	}
 
+	void visitInstVMLoad2(InstVMLoad2 *ins)
+	{
+		printName(ins);
+		print(ins->sz);
+		print(ins->sgn);
+		printOperands(ins);
+	}
+
+	void visitInstVMLoad4(InstVMLoad4 *ins)
+	{
+		printName(ins);
+		print(ins->sz);
+		print(ins->sgn);
+		printOperands(ins);
+	}
+
+	void visitInstVMStore2(InstVMStore2 *ins)
+	{
+		printName(ins);
+		print(ins->sz);
+		print(ins->sgn);
+		printOperands(ins);
+	}
+
+	void visitInstVMStore4(InstVMStore4 *ins)
+	{
+		printName(ins);
+		print(ins->sz);
+		print(ins->sgn);
+		printOperands(ins);
+	}
+
 	void visitInstHcall(InstHcall *ins)
 	{
 		printName(ins);

@@ -17,6 +17,7 @@ struct ElfAotOptions {
 	bool use_llvm{};
 	std::string logs{};
 	std::string mgdump{};
+	u32 threshold{};
 };
 
 static void PrintHelp(bpo::options_description &adesc)
@@ -35,7 +36,8 @@ static bool ParseOptions(ElfAotOptions &o, int argc, char **argv)
 	    ("elf", bpo::value(&o.elf)->required(), "elf file to translate")
 	    ("cache",  bpo::value(&o.cache)->required(), "dbt cache path")
 	    ("llvm",    bpo::value(&o.use_llvm)->default_value(true), "use llvm backend")
-	    ("mgdump", bpo::value(&o.mgdump)->default_value(""), "module graphs dump dir, specify to enable");
+	    ("mgdump", bpo::value(&o.mgdump)->default_value(""), "module graphs dump dir, specify to enable")
+	    ("threshold", bpo::value(&o.threshold)->default_value(1000), "threshold of execution count to compile");
 	// clang-format on
 
 	try {
@@ -82,7 +84,7 @@ int main(int argc, char **argv)
 	dbt::ukernel::ReproduceElfMappings(opts.elf.c_str());
 
 	if (opts.use_llvm) {
-		dbt::LLVMAOTCompileELF();
+		dbt::LLVMAOTCompileELF(opts.threshold);
 	} else {
 		dbt::AOTCompileELF();
 	}

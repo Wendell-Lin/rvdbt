@@ -106,7 +106,7 @@ qir::RegN QRegAlloc::AllocPReg(RegMask desire, RegMask avoid)
 			return p;
 		}
 	}
-	Panic();
+	Panic("Cannot allocate preg");
 }
 
 void QRegAlloc::EmitSpill(RTrack *v)
@@ -432,6 +432,26 @@ public:
 	}
 
 	void visitInstVMStore(qir::InstVMStore *ins)
+	{
+		ra->AllocOp(ins);
+	}
+	
+	void visitInstVMLoad2(qir::InstVMLoad2 *ins)
+	{
+		ra->AllocOp(ins);
+	}
+
+	void visitInstVMLoad4(qir::InstVMLoad4 *ins)
+	{
+		ra->AllocOp(ins);
+	}
+
+	void visitInstVMStore2(qir::InstVMStore2 *ins)
+	{
+		ra->AllocOp(ins);
+	}
+
+	void visitInstVMStore4(qir::InstVMStore4 *ins)
 	{
 		ra->AllocOp(ins);
 	}

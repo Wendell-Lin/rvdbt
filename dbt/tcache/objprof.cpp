@@ -164,6 +164,9 @@ tcache::MapType::iterator objprof::UpdatePageProfile(tcache::MapType::iterator i
 			}
 		};
 
+		page_data->exec_ns[po_idx] = tb->flags.exec_ns;
+		page_data->exec_count[po_idx] = tb->flags.exec_count;
+		log_prof("Update PageData for pageno=%u, po_idx=%u, exec_ns=%llu, exec_count=%llu", pageno, po_idx, page_data->exec_ns[po_idx], page_data->exec_count[po_idx]);
 		upd_observed(page_data->executed, true);
 		upd_observed(page_data->brind_target, tb->flags.is_brind_target);
 		upd_observed(page_data->segment_entry, tb->flags.is_segment_entry);

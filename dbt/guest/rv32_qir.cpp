@@ -3,6 +3,7 @@
 #include "dbt/guest/rv32_runtime.h"
 #include "dbt/qmc/qir_printer.h"
 #include "dbt/tcache/cflow_dump.h"
+#include "dbt/execute.h"
 
 #include <sstream>
 
@@ -347,6 +348,13 @@ TRANSLATOR_Brcc(blt, LT);
 TRANSLATOR_Brcc(bge, GE);
 TRANSLATOR_Brcc(bltu, LTU);
 TRANSLATOR_Brcc(bgeu, GEU);
+// TRANSLATOR_Helper(beq);
+// TRANSLATOR_Helper(bne);
+// TRANSLATOR_Helper(blt);
+// TRANSLATOR_Helper(bge);
+// TRANSLATOR_Helper(bltu);
+// TRANSLATOR_Helper(bgeu);
+
 TRANSLATOR_Load(lb, I8, S);
 TRANSLATOR_Load(lh, I16, S);
 TRANSLATOR_Load(lw, I32, S);
@@ -355,6 +363,14 @@ TRANSLATOR_Load(lhu, I16, U);
 TRANSLATOR_Store(sb, I8, U);
 TRANSLATOR_Store(sh, I16, U);
 TRANSLATOR_Store(sw, I32, U);
+// TRANSLATOR_Helper(lb);
+// TRANSLATOR_Helper(lh);
+// TRANSLATOR_Helper(lw);
+// TRANSLATOR_Helper(lbu);
+// TRANSLATOR_Helper(lhu);
+// TRANSLATOR_Helper(sb);
+// TRANSLATOR_Helper(sh);
+// TRANSLATOR_Helper(sw);
 TRANSLATOR_ArithmRI(addi, add);
 TRANSLATOR_Setcc(slti, LT);
 TRANSLATOR_Setcc(sltiu, LTU);

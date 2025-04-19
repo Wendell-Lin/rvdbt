@@ -14,7 +14,7 @@ std::multimap<u32, jitabi::ppoint::BranchSlot *> tcache::link_map;
 void tcache::Init()
 {
 	l1_cache.fill(nullptr);
-	l1_brind_cache.fill({0, nullptr});
+	l1_brind_cache.fill({0, nullptr, nullptr});
 	tcache_map.clear();
 	tb_pool.Init(TB_POOL_SIZE, PROT_READ | PROT_WRITE);
 	code_pool.Init(CODE_POOL_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC);
@@ -25,7 +25,7 @@ void tcache::Destroy()
 	log_tcache("Destroy tcache, code_pool size: %zu", code_pool.GetUsedSize());
 
 	l1_cache.fill(nullptr);
-	l1_brind_cache.fill({0, nullptr});
+	l1_brind_cache.fill({0, nullptr, nullptr});
 	tcache_map.clear();
 	tb_pool.Destroy();
 	code_pool.Destroy();
@@ -34,7 +34,7 @@ void tcache::Destroy()
 void tcache::Invalidate()
 {
 	l1_cache.fill(nullptr);
-	l1_brind_cache.fill({0, nullptr});
+	l1_brind_cache.fill({0, nullptr, nullptr});
 	tcache_map.clear();
 	tb_pool.Reset();
 	code_pool.Reset();

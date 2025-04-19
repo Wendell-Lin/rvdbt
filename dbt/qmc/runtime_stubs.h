@@ -24,7 +24,7 @@ enum class RuntimeStubId {
 #define X(name) id_##name,
 	RUNTIME_STUBS(X)
 #undef X
-	    Count,
+	Count,
 };
 
 struct RuntimeStubTab {

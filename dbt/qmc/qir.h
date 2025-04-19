@@ -305,6 +305,9 @@ struct alignas(alignof(VOperand)) Inst : IListNode<Inst>, InstOperandAccessMixin
 		SIDEEFF = 1 << 0,
 		REXIT = 1 << 1,
 		HAS_CALLS = 1 << 2,
+		HAS_LOADS = 1 << 3,
+		HAS_STORES = 1 << 4,
+		HAS_BRCC = 1 << 5,
 	};
 
 	Op GetOpcode() const
@@ -601,6 +604,60 @@ struct InstVMStore : InstWithOperands<0, 2> {
 	VType sz;
 	VSign sgn;
 };
+
+struct InstVMLoad2 : InstWithOperands<2, 1> {
+	InstVMLoad2(VType sz_, VSign sgn_, VOperand d1, VOperand d2, VOperand ptr)
+	    : InstWithOperands(Op::_vmload2, {d1, d2}, {ptr}), sz(sz_), sgn(sgn_)
+	{
+	}
+
+	VType sz;
+	VSign sgn;
+};
+
+struct InstVMLoad4 : InstWithOperands<4, 1> {
+	InstVMLoad4(VType sz_, VSign sgn_, VOperand d1, VOperand d2, VOperand d3, VOperand d4, VOperand ptr)
+	    : InstWithOperands(Op::_vmload4, {d1, d2, d3, d4}, {ptr}), sz(sz_), sgn(sgn_)
+	{
+	}
+
+	VType sz;
+	VSign sgn;
+};
+
+/*
+Note:
+	the order of vals is reversed from the IR when Qsel, 
+	because the jit emit always use the same order instead of riscv load store.
+	E.g., store two like below:
+	store t1, 4(a0)
+	store t2, 0(a0)
+	will have corresponding load like below:
+	load t2, 0(a0)
+	load t1, 4(a0)
+
+	but when jit emit in x86, it store two ints from low to high, so the order of vals is reversed.
+*/
+struct InstVMStore2 : InstWithOperands<0, 3> {
+	InstVMStore2(VType sz_, VSign sgn_, VOperand ptr, VOperand val1, VOperand val2)
+	    : InstWithOperands(Op::_vmstore2, {}, {ptr, val1, val2}), sz(sz_), sgn(sgn_)
+	{
+	}
+
+	VType sz;
+	VSign sgn;
+};
+
+struct InstVMStore4 : InstWithOperands<0, 5> {
+	InstVMStore4(VType sz_, VSign sgn_, VOperand ptr, VOperand val1, VOperand val2, VOperand val3, VOperand val4)
+	    : InstWithOperands(Op::_vmstore4, {}, {ptr, val1, val2, val3, val4}), sz(sz_), sgn(sgn_)
+	{
+	}
+
+	VType sz;
+	VSign sgn;
+};
+
 
 struct InstSetcc : InstWithOperands<1, 2> {
 	InstSetcc(CondCode cc_, VOperand d, VOperand sl, VOperand sr)

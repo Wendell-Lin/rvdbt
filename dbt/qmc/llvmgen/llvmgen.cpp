@@ -652,6 +652,29 @@ void QIRToLLVM::Emit_vmstore(qir::InstVMStore *ins)
 	AScopeVMem(lb->CreateAlignedStore(val, mem_ep, align));
 }
 
+void QIRToLLVM::Emit_vmload2(qir::InstVMLoad2 *ins)
+{
+	log_qir("emit vmload2 in llvmgen");
+	Panic("TODO: emit vmload2 in llvmgen");
+}
+
+void QIRToLLVM::Emit_vmload4(qir::InstVMLoad4 *ins)
+{
+	log_qir("emit vmload4 in llvmgen");
+	Panic("TODO: emit vmload4 in llvmgen");
+}
+
+void QIRToLLVM::Emit_vmstore2(qir::InstVMStore2 *ins)
+{
+	log_qir("emit vmstore2 in llvmgen");
+	Panic("TODO: emit vmstore2 in llvmgen");
+}
+
+void QIRToLLVM::Emit_vmstore4(qir::InstVMStore4 *ins)
+{
+	log_qir("emit vmstore4 in llvmgen");
+	Panic("TODO: emit vmstore4 in llvmgen");
+}	
 void QIRToLLVM::Emit_setcc(qir::InstSetcc *ins)
 {
 	auto cmp = lb->CreateICmp(MakeCC(ins->cc), LoadVOperand(ins->i(0)), LoadVOperand(ins->i(1)));

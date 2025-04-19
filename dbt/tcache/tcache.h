@@ -29,6 +29,8 @@ struct alignas(8) TBlock {
 	struct {
 		bool is_brind_target : 1 {false};
 		bool is_segment_entry : 1 {false};
+		u64 exec_count : 64 {0};
+		u64 exec_ns : 64 {0};
 	} flags;
 };
 
@@ -61,7 +63,7 @@ struct tcache {
 
 	static void CacheBrind(TBlock *tb)
 	{
-		l1_brind_cache[l1hash(tb->ip)] = {tb->ip, tb->tcode.ptr};
+		l1_brind_cache[l1hash(tb->ip)] = {tb->ip, tb->tcode.ptr, tb};
 		if (unlikely(!tb->flags.is_brind_target)) {
 			cflow_dump::RecordBrindEntry(tb->ip);
 		}
@@ -84,6 +86,7 @@ struct tcache {
 	struct BrindCacheEntry {
 		u32 gip;
 		void *code;
+		TBlock *tb;
 	};
 	using L1BrindCache = std::array<BrindCacheEntry, 1u << L1_CACHE_BITS>;
 	static L1BrindCache l1_brind_cache;

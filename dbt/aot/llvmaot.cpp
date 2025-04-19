@@ -40,13 +40,15 @@ struct LLVMAOTCompilerRuntime final : CompilerRuntime {
 	}
 };
 
-static void DeclareKnownRegionEntries(qir::LLVMGenCtx *ctx, objprof::PageData const &page)
+static void DeclareKnownRegionEntries(qir::LLVMGenCtx *ctx, objprof::PageData const &page, u32 threshold)
 {
 	u32 const page_vaddr = page.pageno << mmu::PAGE_BITS;
 	qir::CodeSegment segment(page_vaddr, mmu::PAGE_SIZE);
 
 	for (u32 idx = 0; idx < page.executed.size(); ++idx) {
-		if (!page.executed[idx]) {
+		// if (!page.executed[idx]) 
+		if (!page.executed[idx] || page.exec_count[idx] < threshold)
+		{
 			continue;
 		}
 		if (page.brind_target[idx] || page.segment_entry[idx]) {
@@ -57,17 +59,23 @@ static void DeclareKnownRegionEntries(qir::LLVMGenCtx *ctx, objprof::PageData co
 }
 
 static void LLVMAOTTranslatePage(qir::LLVMGenCtx *ctx, std::vector<AOTSymbol> *aot_symbols,
-				 objprof::PageData const &page)
+				 objprof::PageData const &page, u32 threshold)
 {
 	auto mg = BuildModuleGraph(page);
 	auto regions = mg.ComputeRegions();
 
 	for (auto const &r : regions) {
+		if (r[0]->flags.exec_count < threshold) {
+			continue;
+		}
 		ctx->AddFunction(r[0]->ip, mg.segment);
 	}
 
 	for (auto const &r : regions) {
 		assert(r[0]->flags.region_entry);
+		if (r[0]->flags.exec_count < threshold) {
+			continue;
+		}
 		qir::CompilerJob::IpRangesSet ipranges;
 		for (auto n : r) {
 			ipranges.push_back({n->ip, n->ip_end});
@@ -155,7 +163,7 @@ static void GenerateObjectFile(llvm::Module *cmodule, std::string const &filenam
 	dest.flush();
 }
 
-void LLVMAOTCompileELF()
+void LLVMAOTCompileELF(u32 threshold)
 {
 	auto cmodule = llvm::Module("qcg_module", qir::g_llvm_ctx);
 	qir::LLVMGenCtx ctx(&cmodule);
@@ -164,10 +172,10 @@ void LLVMAOTCompileELF()
 	aot_symbols.reserve(64_KB);
 
 	for (auto const &page : objprof::GetProfile()) {
-		DeclareKnownRegionEntries(&ctx, page);
+		DeclareKnownRegionEntries(&ctx, page, threshold);
 	}
 	for (auto const &page : objprof::GetProfile()) {
-		LLVMAOTTranslatePage(&ctx, &aot_symbols, page);
+		LLVMAOTTranslatePage(&ctx, &aot_symbols, page, threshold);
 	}
 	assert(!verifyModule(cmodule, &llvm::errs()));
 

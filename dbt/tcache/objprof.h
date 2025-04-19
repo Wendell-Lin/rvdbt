@@ -47,7 +47,8 @@ struct objprof {
 		}
 
 		using PageBitset = std::bitset<(mmu::PAGE_SIZE >> idx_bits)>;
-
+		std::array<u64, (mmu::PAGE_SIZE >> idx_bits)> exec_ns{};
+		std::array<u64, (mmu::PAGE_SIZE >> idx_bits)> exec_count{};
 		u32 pageno{}; // currently it's vaddr
 		PageBitset executed{};
 		PageBitset brind_target{};

@@ -8,8 +8,12 @@
 	BASE(brcc, InstBrcc, 0)                                                                              \
 	BASE(gbr, InstGBr, Flags::REXIT)                                                                     \
 	BASE(gbrind, InstGBrind, Flags::REXIT)                                                               \
-	BASE(vmload, InstVMLoad, Flags::SIDEEFF)                                                             \
-	BASE(vmstore, InstVMStore, Flags::SIDEEFF)                                                           \
+	BASE(vmload, InstVMLoad, Flags::SIDEEFF)                                         					 \
+	BASE(vmload2, InstVMLoad2, Flags::SIDEEFF)										                     \
+	BASE(vmload4, InstVMLoad4, Flags::SIDEEFF)										                     \
+	BASE(vmstore, InstVMStore, Flags::SIDEEFF)                                       					 \
+	BASE(vmstore2, InstVMStore2, Flags::SIDEEFF)										                     \
+	BASE(vmstore4, InstVMStore4, Flags::SIDEEFF)										                     \
 	BASE(setcc, InstSetcc, 0)                                                                            \
 	/* unary */                                                                                          \
 	LEAF(mov, InstUnop, 0)                                                                               \

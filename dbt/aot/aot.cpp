@@ -30,6 +30,9 @@ ModuleGraph BuildModuleGraph(objprof::PageData const &page)
 		if (page.segment_entry[idx]) {
 			mg.RecordSegmentEntry(ip);
 		}
+		if (page.exec_count[idx] > 0) {
+			mg.RecordExec(ip, page.exec_ns[idx], page.exec_count[idx]);
+		}
 	}
 
 	for (size_t idx = 0; idx < iplist.size(); ++idx) {
@@ -50,6 +53,9 @@ static void AOTCompilePage(CompilerRuntime *aotrt, objprof::PageData const &page
 #if 1
 	for (auto const &r : regions) {
 		assert(r[0]->flags.region_entry);
+		// if (r[0]->flags.exec_count <= 10000)
+		// 	continue;
+		// log_aot("Compile region: %08x, %08x", r[0]->ip, r[r.size() - 1]->ip_end);
 		qir::CompilerJob::IpRangesSet ipranges;
 		for (auto n : r) {
 			ipranges.push_back({n->ip, n->ip_end});

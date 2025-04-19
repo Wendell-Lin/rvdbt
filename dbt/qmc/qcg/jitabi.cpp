@@ -145,6 +145,7 @@ HELPER void *qcgstub_brind(CPUState *state, u32 gip)
 	state->ip = gip;
 	auto *found = tcache::Lookup(gip);
 	if (likely(found)) {
+		found->flags.exec_count += 1;
 		tcache::CacheBrind(found);
 		return (void *)found->tcode.ptr;
 	}
@@ -184,9 +185,9 @@ HELPER_ASM void qcgstub_trace()
 
 	asm("pushq	%r13\n\t"
 	    "movq	%r13, %rdi\n\t" // STATE
-	    "subq	$8, %rsp\n\t"
+	    "subq	$16, %rsp\n\t"
 	    "callq	qcg_DumpTrace@plt\n\t"
-	    "addq	$8, %rsp\n\t"
+	    "addq	$16, %rsp\n\t"
 	    "popq	%r13\n\t");
 
 	asm(POP_NONCSR_GPR());

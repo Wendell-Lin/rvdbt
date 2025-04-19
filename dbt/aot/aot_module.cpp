@@ -33,8 +33,8 @@ static void DumpModuleGraph(ModuleGraph *mg, std::vector<std::vector<ModuleGraph
 
 void ModuleGraph::Dump(FILE *f, std::vector<std::vector<ModuleGraphNode *>> const *regions)
 {
-	auto const add_node = [f](u32 ip, char const *color) {
-		fprintf(f, "B%08x[fillcolor=%s]\n", ip, color);
+	auto const add_node = [f](u32 ip, u64 exec_ns, u64 exec_count, char const *color) {
+		fprintf(f, "B%08x[fillcolor=%s,label=\"%08x\\n%llu\\n%llu\"]\n", ip, color, ip, exec_ns, exec_count);
 	};
 
 	auto const add_edge = [f](u32 src, u32 tgt, char const *opts) {
@@ -44,7 +44,7 @@ void ModuleGraph::Dump(FILE *f, std::vector<std::vector<ModuleGraphNode *>> cons
 	auto dump_node = [&](ModuleGraphNode const &n) {
 		auto flags = n.flags;
 
-		add_node(n.ip, flags.is_segment_entry  ? "green"
+		add_node(n.ip, n.flags.exec_ns, n.flags.exec_count, flags.is_segment_entry  ? "green"
 			       : flags.is_brind_target ? "orange"
 			       : flags.region_entry    ? "purple"
 						       : "cyan");
