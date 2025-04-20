@@ -252,8 +252,9 @@ void QEmit::Emit_gbrind(qir::InstGBrind *ins)
 		auto tmp0 = asmjit::x86::rdi;
 		auto tmp1 = asmjit::x86::rdx;
 		auto tmp2 = asmjit::x86::r12;
-		// auto tmp3 = asmjit::x86::r14;
-		// auto tmp4 = asmjit::x86::r15;
+		// auto tmp0 = asmjit::x86::r12;
+		// auto tmp1 = asmjit::x86::r13;
+		// auto tmp2 = asmjit::x86::r14;
 
 		if (jit_mode) {
 			j.mov(tmp1.r64(), (uptr)tcache::l1_brind_cache.data());
@@ -261,22 +262,24 @@ void QEmit::Emit_gbrind(qir::InstGBrind *ins)
 			j.mov(tmp1.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, l1_brind_cache)));
 		}
 
-		// static_assert(sizeof(tcache::BrindCacheEntry) == 1u << 4); // the size has been changed to count number of executions.
+		static_assert(sizeof(tcache::BrindCacheEntry) == 16); // the size has been changed to count number of executions.
 		static_assert(offsetof(tcache::BrindCacheEntry, gip) == 0);
 
 		j.lea(tmp0.r32(), asmjit::x86::ptr(0, ptgt.r64(), 2));
 		j.and_(tmp0.r32(), ((1ull << tcache::L1_CACHE_BITS) - 1) << 4);
-
+	
 		j.cmp(asmjit::x86::ptr(tmp1.r64(), tmp0.r64(), 0, 0, sizeof(u32)), ptgt.r32());
 		j.jne(slowpath);
 
 		FrameDestroy();
 		if (jit_mode) {
-			j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), offsetof(TBlock, flags)));
-			j.inc(asmjit::x86::qword_ptr(tmp2.r64(), 
-				offsetof(TBlock, flags) +      // Offset to flags struct
-				16));                          // Offset to exec_count (after is_brind_target, is_segment_entry)
-		} 
+			j.mov(tmp2.r64(), (uptr)tcache::l1_brind_cache_tb.data());
+		} else {
+			j.mov(tmp2.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, l1_brind_cache_tb)));
+		}
+		j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp0.r64(), 0, offsetof(tcache::BrindCacheEntry, code)));
+        // Increment exec_count in TBlock flags, manually computed offset since the flags are not public
+        j.inc(asmjit::x86::qword_ptr(tmp2.r64(), offsetof(TBlock, flags) + 8));
 
 		j.jmp(asmjit::x86::ptr(tmp1.r64(), tmp0.r64(), 0, offsetof(tcache::BrindCacheEntry, code),
 				       sizeof(u64)));

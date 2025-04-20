@@ -77,7 +77,7 @@ void CPUStateImpl::DumpTrace(char const *event)
 		cur += sprintf(cur, "%4.4s=%08x", insn::GRPToName(i), gpr[i]);
 	}
 
-	log_trace.write(buf.data());
+	// log_trace.write(buf.data());
 }
 
 } // namespace dbt::rv32

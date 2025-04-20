@@ -16,6 +16,7 @@ struct ElfRunOptions {
 	std::string fsroot{};
 	std::string cache{};
 	bool use_aot{};
+	bool merge_ls{};
 	std::string logs{};
 };
 
@@ -58,7 +59,8 @@ static bool ParseOptions(ElfRunOptions &o, int argc, char **argv)
 	    ("logs",   bpo::value(&o.logs)->default_value(""), "enabled log streams separated by :")
 	    ("fsroot", bpo::value(&o.fsroot)->required(), "isolated path for emulated process")
 	    ("cache",  bpo::value(&o.cache)->required(), "dbt cache path")
-	    ("aot",    bpo::value(&o.use_aot)->default_value(false), "boot aot file if available");
+	    ("aot",    bpo::value(&o.use_aot)->default_value(false), "boot aot file if available")
+	    ("merge_ls", bpo::value(&o.merge_ls)->default_value(false), "merge load/store instructions");
 	// clang-format on
 
 	try {
@@ -98,6 +100,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	auto gargs = opts.guest_args;
+	dbt::config::merge_ls = opts.merge_ls;
 
 	SetupLogger(opts.logs);
 
@@ -110,7 +113,9 @@ int main(int argc, char **argv)
 	dbt::ukernel::MainThreadBoot(static_cast<int>(gargs.size()), gargs.data());
 	int guest_rc = dbt::ukernel::MainThreadExecute();
 
-	dbt::objprof::UpdateProfile();
+	if (!opts.use_aot) { // temporarily avoid updating profile after using aot
+		dbt::objprof::UpdateProfile();
+	}
 
 	if constexpr (dbt::config::debug) {
 		dbt::objprof::Destroy();

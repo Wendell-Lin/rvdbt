@@ -76,6 +76,7 @@ static void LLVMAOTTranslatePage(qir::LLVMGenCtx *ctx, std::vector<AOTSymbol> *a
 		if (r[0]->flags.exec_count < threshold) {
 			continue;
 		}
+		log_aot("Compiling region with 1st ip: %x", r[0]->ip);
 		qir::CompilerJob::IpRangesSet ipranges;
 		for (auto n : r) {
 			ipranges.push_back({n->ip, n->ip_end});
@@ -226,6 +227,7 @@ void LLVMAOTCompileELF(u32 threshold)
 	auto obj_path = objprof::GetCachePath(AOT_O_EXTENSION);
 	GenerateObjectFile(&cmodule, obj_path);
 	// ProcessLLVMStackmaps(aot_symbols);
+	log_aot("Number of symbols: %zu", aot_symbols.size());
 	LinkAOTObject(aot_symbols);
 }
 

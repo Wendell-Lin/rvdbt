@@ -105,11 +105,12 @@ class LIBRISCVExec(BaseExec):
 class RVDBTExec(BaseExec):
     build_dir = None
 
-    def __init__(self, aot, llvm=False):
+    def __init__(self, aot, llvm=False, hotspot_threshold=0):
         super().__init__()
         self.name = "rvdbt-" + ("jit", ("qcgaot", "llvmaot")[llvm])[aot]
         self.aot = aot
         self.llvm = llvm
+        self.hotspot_threshold = hotspot_threshold
 
     def setup(self, root, cmd):
         super().setup(root, cmd)
@@ -120,6 +121,7 @@ class RVDBTExec(BaseExec):
         pargs = [RVDBTExec.build_dir + "/bin/elfaot",
                  "--cache=dbtcache",
                  "--llvm=" + ("off", "on")[self.llvm],
+                 "--threshold=" + str(self.hotspot_threshold),
                  "--elf=" + self.root + "/" + self.args[0]]
         print(f"Setup command: {self.root}${" ".join(pargs)}")
         p = subprocess.Popen(pargs, cwd=RVDBTExec.build_dir,
@@ -395,6 +397,8 @@ def RunTests(opts):
             execs.append(RVDBTExec(True, False))  # QCG AOT
         if opts.rvdbt_llvmaot:
             execs.append(RVDBTExec(True, True))  # LLVM AOT
+        if opts.rvdbt_llvmaot_1000:
+            execs.append(RVDBTExec(True, True, 1000))  # LLVM AOT with hotspot threshold
         if opts.libriscv:
             execs.append(LIBRISCVExec("bt"))  # LibRISCV BT mode
         return execs
@@ -440,6 +444,7 @@ def main():
     op.add_option("--rvdbt-jit", action="store_true", dest="rvdbt_jit", default=False)
     op.add_option("--rvdbt-qcgaot", action="store_true", dest="rvdbt_qcgaot", default=False)
     op.add_option("--rvdbt-llvmaot", action="store_true", dest="rvdbt_llvmaot", default=False)
+    op.add_option("--rvdbt-llvmaot-1000", action="store_true", dest="rvdbt_llvmaot_1000", default=False)
     op.add_option("--libriscv", action="store_true", dest="libriscv", default=False)
     # set objective to "benchmark" or "test"
     op.add_option("--objective", dest="objective", type="choice", 

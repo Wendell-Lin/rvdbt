@@ -6,6 +6,7 @@ namespace dbt
 
 tcache::L1Cache tcache::l1_cache{};
 tcache::L1BrindCache tcache::l1_brind_cache{};
+tcache::L1BrindCache_tb tcache::l1_brind_cache_tb{};
 tcache::MapType tcache::tcache_map{};
 MemArena tcache::code_pool{};
 MemArena tcache::tb_pool{};
@@ -14,7 +15,8 @@ std::multimap<u32, jitabi::ppoint::BranchSlot *> tcache::link_map;
 void tcache::Init()
 {
 	l1_cache.fill(nullptr);
-	l1_brind_cache.fill({0, nullptr, nullptr});
+	l1_brind_cache.fill({0, nullptr});
+	l1_brind_cache_tb.fill({0, nullptr});
 	tcache_map.clear();
 	tb_pool.Init(TB_POOL_SIZE, PROT_READ | PROT_WRITE);
 	code_pool.Init(CODE_POOL_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC);
@@ -25,7 +27,8 @@ void tcache::Destroy()
 	log_tcache("Destroy tcache, code_pool size: %zu", code_pool.GetUsedSize());
 
 	l1_cache.fill(nullptr);
-	l1_brind_cache.fill({0, nullptr, nullptr});
+	l1_brind_cache.fill({0, nullptr});
+	l1_brind_cache_tb.fill({0, nullptr});
 	tcache_map.clear();
 	tb_pool.Destroy();
 	code_pool.Destroy();
@@ -34,7 +37,8 @@ void tcache::Destroy()
 void tcache::Invalidate()
 {
 	l1_cache.fill(nullptr);
-	l1_brind_cache.fill({0, nullptr, nullptr});
+	l1_brind_cache.fill({0, nullptr});
+	l1_brind_cache_tb.fill({0, nullptr});
 	tcache_map.clear();
 	tb_pool.Reset();
 	code_pool.Reset();
@@ -57,6 +61,11 @@ void tcache::InvalidatePage(u32 pvaddr)
 		}
 	}
 	for (auto &e : l1_brind_cache) {
+		if (rounddown(e.gip, mmu::PAGE_SIZE) == pvaddr) {
+			e = {0, 0};
+		}
+	}
+	for (auto &e : l1_brind_cache_tb) {
 		if (rounddown(e.gip, mmu::PAGE_SIZE) == pvaddr) {
 			e = {0, 0};
 		}

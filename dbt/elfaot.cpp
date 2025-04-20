@@ -37,7 +37,7 @@ static bool ParseOptions(ElfAotOptions &o, int argc, char **argv)
 	    ("cache",  bpo::value(&o.cache)->required(), "dbt cache path")
 	    ("llvm",    bpo::value(&o.use_llvm)->default_value(true), "use llvm backend")
 	    ("mgdump", bpo::value(&o.mgdump)->default_value(""), "module graphs dump dir, specify to enable")
-	    ("threshold", bpo::value(&o.threshold)->default_value(1000), "threshold of execution count to compile");
+	    ("threshold", bpo::value(&o.threshold)->default_value(0), "threshold of execution count to compile");
 	// clang-format on
 
 	try {

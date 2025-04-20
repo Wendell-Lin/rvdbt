@@ -223,11 +223,13 @@ void QSel::Run()
 	for (auto &bb : region->GetBlocks()) {
 		// TODO: refactor below functions and impl them in llvm emit_vmload2, ..., etc.
 		// 		However, below code is correct and works in jit mode
-		// merge_vmload4(bb);
-		// merge_vmload2(bb);
-		// merge_vmstore4(bb);
-		// merge_vmstore2(bb); 
-		// merge_mov_store_mov_add_store(bb);
+		if (dbt::config::merge_ls) {
+			merge_vmload4(bb);
+			merge_vmload2(bb);
+			merge_vmstore4(bb);
+			merge_vmstore2(bb); 
+			merge_mov_store_mov_add_store(bb);
+		}
 		
 		// Then proceed with normal instruction selection
 		auto &ilist = bb.ilist;

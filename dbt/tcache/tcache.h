@@ -63,7 +63,9 @@ struct tcache {
 
 	static void CacheBrind(TBlock *tb)
 	{
-		l1_brind_cache[l1hash(tb->ip)] = {tb->ip, tb->tcode.ptr, tb};
+		// l1_brind_cache[l1hash(tb->ip)] = {tb->ip, tb->tcode.ptr, tb};
+		l1_brind_cache[l1hash(tb->ip)] = {tb->ip, tb->tcode.ptr};
+		l1_brind_cache_tb[l1hash(tb->ip)] = {tb->ip, tb};
 		if (unlikely(!tb->flags.is_brind_target)) {
 			cflow_dump::RecordBrindEntry(tb->ip);
 		}
@@ -86,10 +88,15 @@ struct tcache {
 	struct BrindCacheEntry {
 		u32 gip;
 		void *code;
-		TBlock *tb;
 	};
 	using L1BrindCache = std::array<BrindCacheEntry, 1u << L1_CACHE_BITS>;
 	static L1BrindCache l1_brind_cache;
+	struct BrindCacheEntry_tb {
+		u32 gip;
+		TBlock *tb;
+	};
+	using L1BrindCache_tb = std::array<BrindCacheEntry_tb, 1u << L1_CACHE_BITS>;
+	static L1BrindCache_tb l1_brind_cache_tb;
 
 	static ALWAYS_INLINE u32 l1hash(u32 ip)
 	{

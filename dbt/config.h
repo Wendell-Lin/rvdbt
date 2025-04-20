@@ -28,4 +28,5 @@ static constexpr bool dump_trace = true;
 #else
 static constexpr bool dump_trace = false;
 #endif
+inline bool merge_ls = false;
 } // namespace dbt::config
