@@ -77,6 +77,7 @@ namespace RACtGPR
 constexpr auto R = ArchTraits::GPR_ALL;
 constexpr auto R8 = ArchTraits::GPR_ALL;
 constexpr auto CX = RegMask(0).Set(ArchTraits::RCX);
+constexpr auto BX = RegMask(0).Set(ArchTraits::RBX);
 constexpr auto SI = RegMask(0).Set(ArchTraits::RSI);
 }; // namespace RACtGPR
 
@@ -96,11 +97,11 @@ CT(r8_r_rs32) = InstCt<1, 2>::Make({DEF(GPR(R8))}, {DEF(GPR(R)), DEF(GPR(R), IMM
 CT(r_0_rs32) = InstCt<1, 2>::Make({DEF(GPR(R))}, {ALIAS(0), DEF(GPR(R), IMM(S32))});
 CT(r_0_ru32) = InstCt<1, 2>::Make({DEF(GPR(R))}, {ALIAS(0), DEF(GPR(R), IMM(U32))});
 CT(r_0_cxi) = InstCt<1, 2>::Make({DEF(GPR(R))}, {ALIAS(0), DEF(GPR(CX), IMM(ANY))});
-CT(r_r_r) = InstCt<1, 2>::Make({DEF(GPR(R))}, {DEF(GPR(R)), DEF(GPR(R))});
 CT(ri_r2) = InstCt<0, 3>::Make({}, {DEF(GPR(R), IMM(ANY)), DEF(GPR(R)), DEF(GPR(R))});
 CT(ri_r4) = InstCt<0, 5>::Make({}, {DEF(GPR(R), IMM(ANY)), DEF(GPR(R)), DEF(GPR(R)), DEF(GPR(R)), DEF(GPR(R))});
 CT(r2_ru32) = InstCt<2, 1>::Make({DEF(GPR(R)), DEF(GPR(R))}, {DEF(GPR(R), IMM(U32))});
 CT(r4_ru32) = InstCt<4, 1>::Make({DEF(GPR(R)), DEF(GPR(R)), DEF(GPR(R)), DEF(GPR(R))}, {DEF(GPR(R), IMM(U32))});
+CT(r_r_bx) = InstCt<1, 2>::Make({DEF(GPR(R))}, {DEF(GPR(R)), DEF(GPR(BX))});
 #undef CT
 
 #undef GPR
@@ -127,15 +128,15 @@ CT(r4_ru32) = InstCt<4, 1>::Make({DEF(GPR(R)), DEF(GPR(R)), DEF(GPR(R)), DEF(GPR
 	CT(xor, r_0_rs32)                                                                                    \
 	CT(sra, r_0_cxi)                                                                                     \
 	CT(srl, r_0_cxi)                                                                                     \
-	CT(sll, r_0_cxi)                                                                                     \
-	CT(mul, r_r_r)                                                                                    \
-	CT(mulh, r_r_r)                                                                                    \
-	CT(mulhsu, r_r_r)                                                                                 \
-	CT(mulhu, r_r_r)                                                                                   \
-	CT(div, r_r_r)                                                                                    \
-	CT(divu, r_r_r)                                                                                    \
-	CT(rem, r_r_r)                                                                                    \
-	CT(remu, r_r_r) 											
+	CT(sll, r_0_cxi)                             	                                                        \
+	CT(mul, r_0_ru32)                                                                                    \
+	CT(mulh, r_r_bx)                                                                                    \
+	CT(mulhsu, r_r_bx)                                                                                 \
+	CT(mulhu, r_r_bx)                                                                                   \
+	CT(div, r_r_bx)                                                                                    \
+	CT(divu, r_r_bx)                                                                                    \
+	CT(rem, r_r_bx)                                                                                    \
+	CT(remu, r_r_bx) 											
 
 void ArchTraits::init()
 {

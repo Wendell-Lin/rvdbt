@@ -73,9 +73,10 @@ void CPUStateImpl::DumpTrace(char const *event)
 	// cur += snprintf(cur, 80, "#### %08x #### %s\n", ip, event);
 	log_trace("#### %08x #### %s", ip, event);
 
-	for (int i = 0; i < 32; ++i) {
-		cur += sprintf(cur, "%4.4s=%08x", insn::GRPToName(i), gpr[i]);
-	}
+	// for (int i = 0; i < 32; ++i) {
+	// for (int i = 0; i < 32; ++i) {
+	// 	cur += sprintf(cur, "%4.4s=%08x", insn::GRPToName(i), gpr[i]);
+	// }
 
 	// log_trace.write(buf.data());
 }

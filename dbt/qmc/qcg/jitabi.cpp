@@ -84,8 +84,10 @@ static ALWAYS_INLINE _RetPair TryLinkBranch(CPUState *state, ppoint::BranchSlot 
 {
 	auto found = tcache::Lookup(slot->gip);
 	if (likely(found)) {
+		found->flags.exec_count += 1;
 		slot->Link(found->tcode.ptr);
 		tcache::RecordLink(slot, found, slot->flags.cross_segment);
+		tcache::CacheBr(found);
 		return {slot, found->tcode.ptr};
 	}
 	state->ip = slot->gip;
@@ -125,6 +127,7 @@ HELPER_ASM void qcgstub_link_branch_llvmaot()
 
 HELPER _RetPair qcg_TryLinkBranchJIT(CPUState *state, void *retaddr)
 {
+	log_dbt("TryLinkBranchJIT: %p", retaddr);
 	return TryLinkBranch(state, ppoint::BranchSlot::FromCallPtrRetaddr(retaddr));
 }
 

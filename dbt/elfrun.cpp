@@ -60,7 +60,7 @@ static bool ParseOptions(ElfRunOptions &o, int argc, char **argv)
 	    ("fsroot", bpo::value(&o.fsroot)->required(), "isolated path for emulated process")
 	    ("cache",  bpo::value(&o.cache)->required(), "dbt cache path")
 	    ("aot",    bpo::value(&o.use_aot)->default_value(false), "boot aot file if available")
-	    ("merge_ls", bpo::value(&o.merge_ls)->default_value(false), "merge load/store instructions");
+	    ("merge-ls", bpo::value(&o.merge_ls)->default_value(false), "merge load/store instructions");
 	// clang-format on
 
 	try {

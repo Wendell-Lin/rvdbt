@@ -152,6 +152,7 @@ void QEmit::FrameDestroy()
 void QEmit::Prologue(u32 ip)
 {
 	// j.int3();
+	_entry_ip = ip;
 	FrameSetup();
 }
 
@@ -195,6 +196,12 @@ void QEmit::Emit_br(qir::InstBr *ins)
 {
 	auto bb_s = bb->GetSuccs().at(0);
 	auto bb_ff = &*++bb->getIter();
+	log_dbt("Emit_br: %08x", _entry_ip);
+
+		// j.mov(asmjit::x86::gpq(asmjit::x86::Gp::kIdDi), R_STATE);
+		// // j.mov(asmjit::x86::gpq(asmjit::x86::Gp::kIdSi), asmjit::Imm(_entry_ip));
+		// j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(RuntimeStubId::id_trace));
+
 	if (bb_s != bb_ff) {
 		j.jmp(labels[bb_s->GetId()]);
 	}
@@ -202,6 +209,7 @@ void QEmit::Emit_br(qir::InstBr *ins)
 
 void QEmit::Emit_brcc(qir::InstBrcc *ins)
 {
+	log_dbt("Emit_brcc: %08x", _entry_ip);
 	auto bb_t = bb->GetSuccs().at(0);
 	auto bb_f = bb->GetSuccs().at(1);
 	auto bb_ff = &*++bb->getIter();
@@ -216,13 +224,62 @@ void QEmit::Emit_brcc(qir::InstBrcc *ins)
 	}
 	auto cc = ins->cc;
 
+
+		// j.mov(asmjit::x86::gpq(asmjit::x86::Gp::kIdDi), R_STATE);
+		// // j.mov(asmjit::x86::gpq(asmjit::x86::Gp::kIdSi), asmjit::Imm(_entry_ip));
+		// j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(RuntimeStubId::id_trace));
 	j.emit(asmjit::x86::Inst::kIdCmp, make_operand(vs0), make_operand(vs1));
 	auto jcc = asmjit::x86::Inst::jccFromCond(make_cc(cc));
-	j.emit(jcc, labels[bb_t->GetId()]);
+	// j.emit(jcc, labels[bb_t->GetId()]);
+	auto jump_true = j.newLabel();
+	auto end = j.newLabel();
+	auto real_jump = j.newLabel();
+	j.emit(jcc, jump_true);
+    // j.jmp(end);
 
 	if (bb_f != bb_ff) {
+		// auto tmp0 = asmjit::x86::r12;
+		// auto tmp1 = asmjit::x86::r14;	
+		// u32 f_id = bb_f->GetId();
+		// j.mov(tmp0.r32(), f_id); // move jump target to tmp0
+		// j.lea(tmp1.r32(), asmjit::x86::ptr(0, tmp0.r64(), 2)); // tmp1 = (f_id << 2)
+		// j.and_(tmp1.r32(), ((1ull << tcache::L1_CACHE_BITS) - 1) << 4); // tmp1 = (f_id & ((1 << L1_CACHE_BITS) - 1)) << 4
+		// if (jit_mode) {
+		// 	j.mov(tmp0.r64(), (uptr)tcache::cache_tb_exec_count.data());
+		// } else {
+		// 	j.mov(tmp0.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, cache_tb_exec_count)));
+		// }
+		// j.mov(tmp0.r64(), asmjit::x86::ptr(tmp0.r64(), tmp1.r64(), 0, offsetof(tcache::BrindCacheEntry, code)));
+        // j.inc(asmjit::x86::qword_ptr(tmp0.r64(), offsetof(TBlock, flags) + 8));
 		j.jmp(labels[bb_f->GetId()]);
 	}
+	j.jmp(end);
+	j.bind(jump_true);
+	auto tmp0 = asmjit::x86::rdi;
+	auto tmp1 = asmjit::x86::rsi;	
+	auto tmp2 = asmjit::x86::r12;
+	log_qcg("Emit_brcc: %08x", _entry_ip);
+	j.mov(tmp0.r64(), R_STATE);
+	j.mov(tmp1.r64(), asmjit::Imm(_entry_ip)); // move jump target to tmp0
+	// j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(RuntimeStubId::id_trace));
+	j.lea(tmp1.r32(), asmjit::x86::ptr(0, tmp1.r64(), 2)); // tmp1 = (f_id << 2)
+	j.and_(tmp1.r32(), ((1ull << tcache::L1_CACHE_BITS) - 1) << 4); // tmp1 = (f_id & ((1 << L1_CACHE_BITS) - 1)) << 4
+
+	if (jit_mode) {
+		j.mov(tmp2.r64(), (uptr)tcache::cache_tb_exec_count.data());
+	} else {
+		j.mov(tmp2.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, cache_tb_exec_count)));
+	}
+	j.cmp(asmjit::x86::ptr(tmp2.r64(), tmp1.r64(), 0, 0, sizeof(u32)), asmjit::Imm(_entry_ip));
+	j.jne(real_jump);
+	j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp1.r64(), 0, offsetof(tcache::CacheTbExecCountEntry, tb)));
+	// j.mov(tmp2.r64(), asmjit::Imm(_entry_ip));
+	// j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(RuntimeStubId::id_trace));
+	j.inc(asmjit::x86::qword_ptr(tmp2.r64(), offsetof(TBlock, flags) + 8));
+	j.bind(real_jump);
+	j.jmp(labels[bb_t->GetId()]);
+
+	j.bind(end);
 }
 
 void QEmit::Emit_gbr(qir::InstGBr *ins)
@@ -246,14 +303,14 @@ void QEmit::Emit_gbrind(qir::InstGBrind *ins)
 	assert(ptgt.id() == asmjit::x86::Gp::kIdSi);
 
 	auto slowpath = j.newLabel();
+	// if constexpr (false)
 	{
 		// commented the original 
 		// Inlined l1_brind_cache lookup
 		auto tmp0 = asmjit::x86::rdi;
 		auto tmp1 = asmjit::x86::rdx;
 		auto tmp2 = asmjit::x86::r12;
-		// auto tmp0 = asmjit::x86::r12;
-		// auto tmp1 = asmjit::x86::r13;
+		// auto tmp1 = asmjit::x86::r12;
 		// auto tmp2 = asmjit::x86::r14;
 
 		if (jit_mode) {
@@ -273,12 +330,12 @@ void QEmit::Emit_gbrind(qir::InstGBrind *ins)
 
 		FrameDestroy();
 		if (jit_mode) {
-			j.mov(tmp2.r64(), (uptr)tcache::l1_brind_cache_tb.data());
+			j.mov(tmp2.r64(), (uptr)tcache::cache_tb_exec_count.data());
 		} else {
-			j.mov(tmp2.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, l1_brind_cache_tb)));
+			j.mov(tmp2.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, cache_tb_exec_count)));
 		}
 		j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp0.r64(), 0, offsetof(tcache::BrindCacheEntry, code)));
-        // Increment exec_count in TBlock flags, manually computed offset since the flags are not public
+		// todo: this 8 is computed from the size of the flags to exec count, should be changed to another offsetof.
         j.inc(asmjit::x86::qword_ptr(tmp2.r64(), offsetof(TBlock, flags) + 8));
 
 		j.jmp(asmjit::x86::ptr(tmp1.r64(), tmp0.r64(), 0, offsetof(tcache::BrindCacheEntry, code),
@@ -537,49 +594,161 @@ void QEmit::Emit_sll(qir::InstBinop *ins)
 // Regular multiplication (lower word)
 void QEmit::Emit_mul(qir::InstBinop *ins)
 {
-	Panic("mul");
+	EmitInstBinop<asmjit::x86::Inst::kIdImul>(ins);
 }
 
 // Signed high multiplication
 void QEmit::Emit_mulh(qir::InstBinop *ins)
 {
-	Panic("mulh");
+	// Signed high multiplication - use 64-bit IMUL and arithmetic shift
+	// j.emit(asmjit::x86::Inst::kIdImul, make_gpr(ins->o(0)), make_gpr(ins->i(0)), make_gpr(ins->i(1)));
+
+	auto prd = make_gpr(ins->o(0));
+    auto prs0 = make_gpr(ins->i(0)); //r
+    auto prs1 = make_gpr(ins->i(1)); //bx
+
+	assert(prs1.id() == asmjit::x86::Gp::kIdBx);
+	auto eax = asmjit::x86::eax;
+	auto edx = asmjit::x86::edx;
+	j.mov(eax, prs0);
+	j.imul(prs1);
+	j.mov(prd, edx);
 }
 
 // Mixed signed/unsigned high multiplication
 void QEmit::Emit_mulhsu(qir::InstBinop *ins)
 {
-	Panic("mulhsu");
-}
+	auto prd = make_gpr(ins->o(0));
+    auto prs0 = make_gpr(ins->i(0)); //r
+    auto prs1 = make_gpr(ins->i(1)); //bx
 
+	assert(prs1.id() == asmjit::x86::Gp::kIdBx);
+	auto eax = asmjit::x86::eax;
+	auto rax = asmjit::x86::rax;
+	auto rbx = asmjit::x86::rbx;
+	auto edx = asmjit::x86::edx;
+	j.mov(prd, edx);
+	j.mov(eax, prs0);
+	j.movsxd(rax, eax);
+	j.mul(rbx);
+	j.sar(rax, 32);
+	j.mov(edx, prd);
+	j.mov(prd, eax);
+}
 // Unsigned high multiplication
 void QEmit::Emit_mulhu(qir::InstBinop *ins)
 {
-	Panic("mulhu");
+	// j.emit(asmjit::x86::Inst::kIdMul, make_gpr(ins->o(0)), make_gpr(ins->i(0)), make_gpr(ins->i(1)));
+
+	auto prd = make_gpr(ins->o(0));
+    auto prs0 = make_gpr(ins->i(0)); //r
+    auto prs1 = make_gpr(ins->i(1)); //bx
+
+	assert(prs1.id() == asmjit::x86::Gp::kIdBx);
+	auto eax = asmjit::x86::eax;
+	auto edx = asmjit::x86::edx;
+	j.mov(eax, prs0);
+	j.mul(prs1);
+	j.mov(prd, edx);
 }
 
 // Signed division
 void QEmit::Emit_div(qir::InstBinop *ins)
 {
-	Panic("div");
+    auto prs0 = make_gpr(ins->i(0));
+    auto prs1 = make_gpr(ins->i(1));
+    auto prd = make_gpr(ins->o(0));
+    auto end = j.newLabel();
+	auto div = j.newLabel();
+
+    // Check division by zero
+	j.mov(prd, asmjit::Imm(0xFFFFFFFF));
+	j.test(prs1, prs1);
+    j.jz(end);  // If zero, use 0xFFFFFFFF already in prd
+    
+    // Check INT32_MIN / -1 overflow case
+    j.cmp(prs0, INT32_MIN);
+    j.jne(div);  // If not INT32_MIN, do normal division
+    j.cmp(prs1, -1);
+    j.jne(div);  // If not -1, do normal division
+    j.mov(prd, INT32_MIN);
+    j.jmp(end);
+
+    // Normal division
+    j.bind(div);
+	j.mov(asmjit::x86::eax, prs0);
+	j.cdq();
+    j.idiv(prs1);
+	j.mov(prd, asmjit::x86::eax);
+    
+    j.bind(end);
 }
 
 // Unsigned division
 void QEmit::Emit_divu(qir::InstBinop *ins)
 {
-	Panic("divu");
+    // Check for division by zero
+	auto prs0 = make_gpr(ins->i(0));
+	auto prs1 = make_gpr(ins->i(1));
+	auto prd = make_gpr(ins->o(0));
+	j.mov(prd, asmjit::Imm(0xFFFFFFFF));
+	j.test(prs1, prs1);
+	asmjit::Label zero = j.newLabel();
+	j.jz(zero);
+
+	j.xor_(asmjit::x86::edx, asmjit::x86::edx);  // Clear high bits	
+	j.mov(asmjit::x86::eax, prs0);
+    j.div(prs1);  // Do unsigned division
+    j.mov(prd, asmjit::x86::eax);  // Move result
+	
+	j.bind(zero);
 }
 
 // Signed remainder
 void QEmit::Emit_rem(qir::InstBinop *ins)
 {
-	Panic("rem");
+	auto prs0 = make_gpr(ins->i(0));
+	auto prs1 = make_gpr(ins->i(1));
+	auto prd = make_gpr(ins->o(0));
+	asmjit::Label end = j.newLabel();
+	asmjit::Label rem = j.newLabel();
+	j.mov(prd, prs0);
+	j.test(prs1, prs1);
+	j.jz(end);
+
+	j.cmp(prs0, INT32_MIN);
+    j.jne(rem);  // If not INT32_MIN, do normal division
+    j.cmp(prs1, -1);
+    j.jne(rem);  // If not -1, do normal division
+    j.mov(prd, 0);
+    j.jmp(end);
+
+	j.bind(rem);
+	j.mov(asmjit::x86::eax, prs0);
+	j.cdq();
+    j.idiv(prs1);  // Do signed division
+    j.mov(prd, asmjit::x86::edx);  // Move result
+	
+	j.bind(end);
 }
 
 // Unsigned remainder
 void QEmit::Emit_remu(qir::InstBinop *ins)
 {
-	Panic("remu");
+	auto prs0 = make_gpr(ins->i(0));
+	auto prs1 = make_gpr(ins->i(1));
+	auto prd = make_gpr(ins->o(0));
+	j.mov(prd, prs0);
+	j.test(prs1, prs1);
+	asmjit::Label zero = j.newLabel();
+	j.jz(zero);
+
+	j.xor_(asmjit::x86::edx, asmjit::x86::edx);  // Clear high bits	
+	j.mov(asmjit::x86::eax, prs0);
+    j.div(prs1);  // Do unsigned division
+    j.mov(prd, asmjit::x86::edx);  // Move result
+	
+	j.bind(zero);
 }
 
 } // namespace dbt::qcg

@@ -18,8 +18,19 @@ def process_benchmark_data():
 # dhrystone,1.000,0.864,0.839,2.374,1.348
 # primes,1.000,1.003,0.978,1.837,1.100
 # sha512,1.000,0.588,0.525,2.319,1.022"""
-    data = """benchmark-name,qemu,rvdbt-jit,rvdbt-qcgaot,rvdbt-llvmaot,rvlinux-bt
-sha512,1.000,0.583,0.520,2.550,1.039"""
+    data = """benchmark-name,qemu,rvdbt-jit,rvdbt-jit-merge-ls,rvdbt-llvmaot,rvdbt-llvmaot-hotspot-1000
+numeric-sort,1.000,1.324,1.339,2.137,1.345
+string-sort,1.000,0.998,1.005,3.196,1.010
+bitfield,1.000,0.678,0.702,2.033,0.702
+emfloat,1.000,0.956,0.953,4.351,2.146
+assignment,1.000,1.267,1.212,2.197,1.692
+IDEA,1.000,1.201,1.520,3.232,1.249
+Huffman,1.000,1.277,1.274,2.526,1.279
+dhrystone,1.000,0.853,1.028,2.414,1.717
+primes,1.000,1.011,0.997,1.534,1.000
+sha512,1.000,0.583,0.603,2.534,2.028"""
+#     data = """benchmark-name,qemu,rvdbt-jit,rvdbt-qcgaot,rvdbt-llvmaot,rvlinux-bt
+# sha512,1.000,0.583,0.520,2.550,1.039"""
 #     data = """benchmark-name,qemu,rvlinux-bt
 # numeric-sort,1.000,1.033
 # string-sort,1.000,0.609

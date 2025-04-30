@@ -10,7 +10,7 @@ pipeline {
                 echo 'Build the project'
                 sh 'git submodule update --init --recursive'
                 sh 'chmod +x ./scripts/build.sh'
-                sh './scripts/build.sh 19'
+                sh './scripts/build.sh 20'
             }
         }
 

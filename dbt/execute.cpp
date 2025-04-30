@@ -79,6 +79,7 @@ void Execute(CPUState *state)
 		if (branch_slot) {
 			branch_slot->Link(tb->tcode.ptr);
 			tcache::RecordLink(branch_slot, tb, branch_slot->flags.cross_segment);
+			tcache::CacheBr(tb);
 		} else {
 			tcache::CacheBrind(tb);
 		}

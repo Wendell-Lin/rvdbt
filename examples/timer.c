@@ -29,7 +29,7 @@ int main()
 		return 1;
 	}
 
-	printf("gettimeofday   : s=%lld us=%lld\n", (long long)tv.tv_sec, (long long)tv.tv_usec);
+	// printf("gettimeofday   : s=%lld us=%lld\n", (long long)tv.tv_sec, (long long)tv.tv_usec);
 	printf("clock_gettime64: s=%lld ns=%lld\n", (long long)kt.tv_sec, (long long)kt.tv_nsec);
 	return 0;
 }

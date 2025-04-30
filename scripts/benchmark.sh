@@ -4,6 +4,8 @@ python3 examples/benchmarks.py \
     --prebuilts $(pwd)/prebuilts \
     --riscv32-gcc riscv32-unknown-elf-gcc \
     --rvdbt-jit \
-    --rvdbt-qcgaot \
+    --rvdbt-jit-merge-ls \
     --rvdbt-llvmaot \
-    --libriscv
+    --rvdbt-llvmaot-1000
+    # --rvdbt-qcgaot \
+    # --libriscv

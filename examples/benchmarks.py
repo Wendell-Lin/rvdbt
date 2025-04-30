@@ -105,12 +105,17 @@ class LIBRISCVExec(BaseExec):
 class RVDBTExec(BaseExec):
     build_dir = None
 
-    def __init__(self, aot, llvm=False, hotspot_threshold=0):
+    def __init__(self, aot, llvm=False, hotspot_threshold=0, jit_merge_ls=False):
         super().__init__()
         self.name = "rvdbt-" + ("jit", ("qcgaot", "llvmaot")[llvm])[aot]
+        if jit_merge_ls:
+            self.name += "-merge-ls"
+        if hotspot_threshold > 0:
+            self.name += "-hotspot-" + str(hotspot_threshold)
         self.aot = aot
         self.llvm = llvm
         self.hotspot_threshold = hotspot_threshold
+        self.jit_merge_ls = jit_merge_ls
 
     def setup(self, root, cmd):
         super().setup(root, cmd)
@@ -137,6 +142,7 @@ class RVDBTExec(BaseExec):
                  "--cache=dbtcache",
                  "--fsroot=" + self.root]
         pargs += ["--aot=" + ("off", "on")[self.aot]]
+        pargs += ["--merge-ls=" + ("off", "on")[self.jit_merge_ls]]
         pargs += ["--"] + self.args
         self.print_dir()
         print(f"{" ".join(pargs)}")
@@ -296,15 +302,15 @@ def GetBenchmarks_RV32IA(prebuilts_dir):
 def GetBenchmarks_RV32I(prebuilts_dir):
     b: list[Benchmark] = []
     root = os.path.join(prebuilts_dir + "/rv32emu-i")
-    # b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
-    # b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
-    # b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
-    # b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
-    # b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
-    # b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
-    # b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
-    # b.append(Benchmark(root + "/", ["dhrystone"]))
-    # b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
+    b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
+    b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
+    b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
+    b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
+    b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
+    b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
+    b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
+    b.append(Benchmark(root + "/", ["dhrystone"]))
+    b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
     b.append(Benchmark(root + "/", ["sha512"], cmp_out=True))
     return b
 
@@ -393,6 +399,8 @@ def RunTests(opts):
         execs = [QEMUExec()]  # QEMU is always included as reference
         if opts.rvdbt_jit:
             execs.append(RVDBTExec(False))  # JIT mode
+        if opts.rvdbt_jit_merge_ls:
+            execs.append(RVDBTExec(False, jit_merge_ls=True))  # JIT merge ls mode
         if opts.rvdbt_qcgaot:
             execs.append(RVDBTExec(True, False))  # QCG AOT
         if opts.rvdbt_llvmaot:
@@ -442,6 +450,7 @@ def main():
     op.add_option("--prebuilts", dest="prebuilts_dir")
     # Add new options for execution modes
     op.add_option("--rvdbt-jit", action="store_true", dest="rvdbt_jit", default=False)
+    op.add_option("--rvdbt-jit-merge-ls", action="store_true", dest="rvdbt_jit_merge_ls", default=False)
     op.add_option("--rvdbt-qcgaot", action="store_true", dest="rvdbt_qcgaot", default=False)
     op.add_option("--rvdbt-llvmaot", action="store_true", dest="rvdbt_llvmaot", default=False)
     op.add_option("--rvdbt-llvmaot-1000", action="store_true", dest="rvdbt_llvmaot_1000", default=False)

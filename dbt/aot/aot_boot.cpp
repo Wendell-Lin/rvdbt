@@ -47,6 +47,7 @@ void BootAOTFile()
 		tb->ip = sym->gip;
 		tb->tcode = TBlock::TCode{l_addr + sym->aot_vaddr, 0};
 		tcache::Insert(tb);
+		tcache::CacheBr(tb); // todo: validate this if a brcc to llvm aot occurs.
 	};
 
 	for (u64 idx = 0; idx < aottab->n_sym; ++idx) {

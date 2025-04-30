@@ -97,7 +97,9 @@ DEF_GPR(R15, R15);
 #define QMC_FIXED_REGS(X)                                                                                    \
 	X(STATE, R13)	/* ghccc0 */                                                                         \
 	X(MEMBASE, RBP) /* ghccc1 */                                                                         \
-	X(SP, RSP)
+	X(SP, RSP) /* todo: below is for rv32m in qemit, but not needed now bcs of rv32 interp handling */
+	// X(AX, RAX)
+	// X(DX, RDX)
 
 #define DEF_FIXED(name, reg) [[maybe_unused]] static constexpr auto name = reg;
 QMC_FIXED_REGS(DEF_FIXED)

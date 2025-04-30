@@ -40,7 +40,18 @@ struct LLVMAOTCompilerRuntime final : CompilerRuntime {
 	}
 };
 
-static void DeclareKnownRegionEntries(qir::LLVMGenCtx *ctx, objprof::PageData const &page, u32 threshold)
+u64 getMaxExecCountInRegion(std::vector<dbt::ModuleGraphNode *> const &region)
+{
+	u64 mx_cnt = 0;
+	for (auto const &n : region) {
+		if (n->flags.exec_count > mx_cnt) {
+			mx_cnt = n->flags.exec_count;
+		}
+	}
+	return mx_cnt;
+}
+
+static void DeclareKnownRegionEntries(qir::LLVMGenCtx *ctx, objprof::PageData const &page, u64 threshold)
 {
 	u32 const page_vaddr = page.pageno << mmu::PAGE_BITS;
 	qir::CodeSegment segment(page_vaddr, mmu::PAGE_SIZE);
@@ -59,23 +70,21 @@ static void DeclareKnownRegionEntries(qir::LLVMGenCtx *ctx, objprof::PageData co
 }
 
 static void LLVMAOTTranslatePage(qir::LLVMGenCtx *ctx, std::vector<AOTSymbol> *aot_symbols,
-				 objprof::PageData const &page, u32 threshold)
+				 objprof::PageData const &page, u64 threshold)
 {
 	auto mg = BuildModuleGraph(page);
 	auto regions = mg.ComputeRegions();
 
 	for (auto const &r : regions) {
-		if (r[0]->flags.exec_count < threshold) {
+		if (getMaxExecCountInRegion(r) < threshold)
 			continue;
-		}
 		ctx->AddFunction(r[0]->ip, mg.segment);
 	}
 
 	for (auto const &r : regions) {
 		assert(r[0]->flags.region_entry);
-		if (r[0]->flags.exec_count < threshold) {
+		if (getMaxExecCountInRegion(r) < threshold)
 			continue;
-		}
 		log_aot("Compiling region with 1st ip: %x", r[0]->ip);
 		qir::CompilerJob::IpRangesSet ipranges;
 		for (auto n : r) {
@@ -164,14 +173,13 @@ static void GenerateObjectFile(llvm::Module *cmodule, std::string const &filenam
 	dest.flush();
 }
 
-void LLVMAOTCompileELF(u32 threshold)
+void LLVMAOTCompileELF(u64 threshold, char optLevel)
 {
 	auto cmodule = llvm::Module("qcg_module", qir::g_llvm_ctx);
 	qir::LLVMGenCtx ctx(&cmodule);
 
 	std::vector<AOTSymbol> aot_symbols;
 	aot_symbols.reserve(64_KB);
-
 	for (auto const &page : objprof::GetProfile()) {
 		DeclareKnownRegionEntries(&ctx, page, threshold);
 	}
@@ -201,7 +209,10 @@ void LLVMAOTCompileELF(u32 threshold)
 		mpm_final_expand.addPass(llvm::VerifierPass());
 	}
 
-	pb.registerOptimizerEarlyEPCallback([&](llvm::ModulePassManager &mpm, llvm::OptimizationLevel optl) {
+	pb.registerOptimizerEarlyEPCallback([&](
+		llvm::ModulePassManager &mpm, 
+		llvm::OptimizationLevel optl,
+		llvm::ThinOrFullLTOPhase phase) {
 		mpm.addPass(llvm::createModuleToFunctionPassAdaptor(qir::IntrinsicExpansionPass(ctx, false)));
 		if constexpr (config::debug) {
 			mpm.addPass(llvm::VerifierPass());

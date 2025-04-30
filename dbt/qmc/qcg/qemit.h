@@ -70,6 +70,7 @@ private:
 	JitErrorHandler jerr{};
 
 	std::vector<asmjit::Label> labels;
+	u32 _entry_ip;
 };
 
 }; // namespace dbt::qcg
