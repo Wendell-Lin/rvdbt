@@ -210,9 +210,9 @@ void LLVMAOTCompileELF(u64 threshold, char optLevel)
 	}
 
 	pb.registerOptimizerEarlyEPCallback([&](
-		llvm::ModulePassManager &mpm, 
-		llvm::OptimizationLevel optl,
-		llvm::ThinOrFullLTOPhase phase) {
+		llvm::ModulePassManager &mpm, llvm::OptimizationLevel optl
+		, llvm::ThinOrFullLTOPhase phase // this line is for llvm 20, for 19 or below, plz comment this parameter
+		) {
 		mpm.addPass(llvm::createModuleToFunctionPassAdaptor(qir::IntrinsicExpansionPass(ctx, false)));
 		if constexpr (config::debug) {
 			mpm.addPass(llvm::VerifierPass());
