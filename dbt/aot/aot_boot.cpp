@@ -4,7 +4,8 @@
 #include "dbt/util/fsmanager.h"
 
 #include <sstream>
-
+#include <fstream>
+#include <string>
 extern "C" {
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -18,13 +19,32 @@ namespace dbt
 {
 LOG_STREAM(aot)
 
+static size_t get_vm_size() {
+    std::ifstream status("/proc/self/status");
+    std::string line;
+    while (std::getline(status, line)) {
+        if (line.rfind("VmSize:", 0) == 0) {
+            std::istringstream iss(line.substr(7)); // skip "VmSize:"
+            size_t vm_kb;
+            std::string unit;
+            iss >> vm_kb >> unit;
+            if (unit == "kB")
+                return vm_kb;
+        }
+    }
+    return 0;
+}
+
+
 void BootAOTFile()
 {
+	size_t vm_size_before = get_vm_size();
 	void *so_handle;
 	link_map *lmap;
 	{
 		DBT_FS_LOCK();
 		auto aot_path = objprof::GetCachePath(AOT_SO_EXTENSION);
+		log_aot("profile name: %s", aot_path.c_str());
 
 		if (so_handle = dlopen(aot_path.c_str(), RTLD_NOW); !so_handle) {
 			log_aot("failed to open %s: %s, skip aot boot", aot_path.c_str(), dlerror());
@@ -53,6 +73,8 @@ void BootAOTFile()
 	for (u64 idx = 0; idx < aottab->n_sym; ++idx) {
 		announce(&aottab->sym[idx]);
 	}
+	size_t vm_size = get_vm_size();
+	log_aot("aot size: %zu KB", vm_size - vm_size_before);
 }
 
 } // namespace dbt

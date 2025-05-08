@@ -10,7 +10,7 @@ namespace dbt
 {
 
 void AOTCompileELF();
-void LLVMAOTCompileELF(u64 threshold, char optLevel);
+void LLVMAOTCompileELF(u64 threshold, bool llvmopt);
 void BootAOTFile();
 
 static constexpr char const *AOT_O_EXTENSION = ".aot.o";

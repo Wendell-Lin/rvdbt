@@ -37,6 +37,7 @@ struct QEmit {
 private:
 	void FrameSetup();
 	void FrameDestroy();
+	void Emit_Cache();
 
 	template <asmjit::x86::Inst::Id Op>
 	ALWAYS_INLINE void EmitInstBinop(qir::InstBinop *ins);

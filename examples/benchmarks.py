@@ -105,9 +105,9 @@ class LIBRISCVExec(BaseExec):
 class RVDBTExec(BaseExec):
     build_dir = None
 
-    def __init__(self, aot, llvm=False, hotspot_threshold=0, jit_merge_ls=False):
+    def __init__(self, aot, llvm=False, hotspot_threshold=0, jit_merge_ls=False, llvmopt=False):
         super().__init__()
-        self.name = "rvdbt-" + ("jit", ("qcgaot", "llvmaot")[llvm])[aot]
+        self.name = "rvdbt-" + ("jit", ("qcgaot", "llvmaot")[llvm])[aot] + ("", "-opt")[llvmopt]
         if jit_merge_ls:
             self.name += "-merge-ls"
         if hotspot_threshold > 0:
@@ -116,7 +116,7 @@ class RVDBTExec(BaseExec):
         self.llvm = llvm
         self.hotspot_threshold = hotspot_threshold
         self.jit_merge_ls = jit_merge_ls
-
+        self.llvmopt = llvmopt
     def setup(self, root, cmd):
         super().setup(root, cmd)
         if not self.aot:
@@ -127,8 +127,9 @@ class RVDBTExec(BaseExec):
                  "--cache=dbtcache",
                  "--llvm=" + ("off", "on")[self.llvm],
                  "--threshold=" + str(self.hotspot_threshold),
-                 "--elf=" + self.root + "/" + self.args[0]]
-        print(f"Setup command: {self.root}${" ".join(pargs)}")
+                 "--elf=" + self.root + "/" + self.args[0],
+                 "--mgdump=" + RVDBTExec.build_dir + "/logs",
+                 "--llvmopt=" + ("off", "on")[self.llvmopt]]
         p = subprocess.Popen(pargs, cwd=RVDBTExec.build_dir,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.out, self.err = p.communicate()
@@ -141,6 +142,8 @@ class RVDBTExec(BaseExec):
         pargs = [RVDBTExec.build_dir + "/bin/elfrun",
                  "--cache=dbtcache",
                  "--fsroot=" + self.root]
+        if self.aot:
+            pargs += ["--logs=aot"]
         pargs += ["--aot=" + ("off", "on")[self.aot]]
         pargs += ["--merge-ls=" + ("off", "on")[self.jit_merge_ls]]
         pargs += ["--"] + self.args
@@ -176,6 +179,9 @@ class Benchmark:
         exec.setup(self.root, self.args)
         if self.ofile:
             exec.ofile = self.ofile
+        if "rvdbt-llvmaot" in exec.name: # if setup with elfaot and success, then change the modulegraph.gv into name
+            print(f"Renaming modulegraph.gv `to {self.name}.gv")
+            os.rename(RVDBTExec.build_dir + "/logs/modulegraph.gv", RVDBTExec.build_dir + "/logs/" + self.name + ".gv")
         exec.run()
         if self.ofile is not None and os.path.isfile(self.ofile):
             os.rename(self.ofile, self.get_ofile(exec))
@@ -271,16 +277,16 @@ def GetBenchmarks_Coremark(prebuilts_dir):
 def GetBenchmarks_RV32EMU(prebuilts_dir):
     b: list[Benchmark] = []
     root = os.path.join(prebuilts_dir + "/rv32emu-workload")
-    # b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
-    # b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
-    # b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
-    # b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
-    # b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
+    b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
+    b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
+    b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
+    b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
+    b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
     # b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
-    # b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
-    # b.append(Benchmark(root + "/", ["dhrystone"]))
+    b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
+    b.append(Benchmark(root + "/", ["dhrystone"]))
     b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
-    # b.append(Benchmark(root + "/", ["sha512"]))
+    b.append(Benchmark(root + "/", ["sha512"]))
     return b
 
 # rv32emu workload, but compiled with rv32ia
@@ -321,8 +327,8 @@ def GetBenchmarks(opts):
     # benchmarks += GetBenchmarks_Security(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Telecomm(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_Coremark(opts.prebuilts_dir)
-    # benchmarks += GetBenchmarks_RV32EMU(opts.prebuilts_dir)
-    benchmarks += GetBenchmarks_RV32I(opts.prebuilts_dir)
+    benchmarks += GetBenchmarks_RV32EMU(opts.prebuilts_dir)
+    # benchmarks += GetBenchmarks_RV32I(opts.prebuilts_dir)
     # benchmarks += GetBenchmarks_RV32IA(opts.prebuilts_dir)
     return benchmarks
 
@@ -407,6 +413,8 @@ def RunTests(opts):
             execs.append(RVDBTExec(True, True))  # LLVM AOT
         if opts.rvdbt_llvmaot_1000:
             execs.append(RVDBTExec(True, True, 1000))  # LLVM AOT with hotspot threshold
+        if opts.rvdbt_llvmaot_opt:
+            execs.append(RVDBTExec(True, True, 1000, llvmopt=True))  # LLVM AOT with optimization
         if opts.libriscv:
             execs.append(LIBRISCVExec("bt"))  # LibRISCV BT mode
         return execs
@@ -433,8 +441,8 @@ def RunTests(opts):
             print(f"  Result: {res.res}")
             print(f"  Time: {res.time}")
             print(f"  Score: {res.score}")
-            print(f"  Return code: {e.rc}")
-            print(f"  Error output: {e.err}")
+            print(f"  Return code: {e.rc}") # if the return code is 0, then below is logs
+            print(f"  Error output or logs: {e.err}") # E.g., [aot] is log_aot
             scores += [res.score]
 
         csvtab += [scores]
@@ -454,6 +462,7 @@ def main():
     op.add_option("--rvdbt-qcgaot", action="store_true", dest="rvdbt_qcgaot", default=False)
     op.add_option("--rvdbt-llvmaot", action="store_true", dest="rvdbt_llvmaot", default=False)
     op.add_option("--rvdbt-llvmaot-1000", action="store_true", dest="rvdbt_llvmaot_1000", default=False)
+    op.add_option("--rvdbt-llvmaot-opt", action="store_true", dest="rvdbt_llvmaot_opt", default=False)
     op.add_option("--libriscv", action="store_true", dest="libriscv", default=False)
     # set objective to "benchmark" or "test"
     op.add_option("--objective", dest="objective", type="choice", 
@@ -464,7 +473,7 @@ def main():
     if not opts.rvdbt_build_dir or not opts.libriscv_build_dir or not opts.prebuilts_dir:
         op.error("usage")
     os.makedirs(opts.rvdbt_build_dir + "/dbtcache", exist_ok=True)
-    os.makedirs('logs', exist_ok=True)
+    os.makedirs(opts.rvdbt_build_dir + "/logs", exist_ok=True)
 
     RVDBTExec.build_dir = opts.rvdbt_build_dir
     LIBRISCVExec.build_dir = opts.libriscv_build_dir

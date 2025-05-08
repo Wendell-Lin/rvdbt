@@ -192,15 +192,32 @@ void QEmit::Emit_hcall(qir::InstHcall *ins)
 	j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(ins->stub));
 }
 
+void QEmit::Emit_Cache()
+{
+	auto tmp0 = asmjit::x86::rdi;
+	auto tmp1 = asmjit::x86::rsi;	
+	auto tmp2 = asmjit::x86::r12;
+	log_qcg("Emit_brcc: %08x", _entry_ip);
+	j.mov(tmp0.r64(), R_STATE);
+	j.mov(tmp1.r64(), asmjit::Imm(_entry_ip)); // move jump target to tmp0
+	j.lea(tmp1.r32(), asmjit::x86::ptr(0, tmp1.r64(), 2)); // tmp1 = (f_id << 2)
+	j.and_(tmp1.r32(), ((1ull << tcache::L1_CACHE_BITS) - 1) << 4); // tmp1 = (f_id & ((1 << L1_CACHE_BITS) - 1)) << 4
+
+	if (jit_mode) {
+		j.mov(tmp2.r64(), (uptr)tcache::cache_tb_exec_count.data());
+	} else {
+		j.mov(tmp2.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, cache_tb_exec_count)));
+	}
+	j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp1.r64(), 0, offsetof(tcache::CacheTbExecCountEntry, tb)));
+	j.inc(asmjit::x86::qword_ptr(tmp2.r64(), offsetof(TBlock, flags) + 8));
+}
+
 void QEmit::Emit_br(qir::InstBr *ins)
 {
 	auto bb_s = bb->GetSuccs().at(0);
 	auto bb_ff = &*++bb->getIter();
-	log_dbt("Emit_br: %08x", _entry_ip);
 
-		// j.mov(asmjit::x86::gpq(asmjit::x86::Gp::kIdDi), R_STATE);
-		// // j.mov(asmjit::x86::gpq(asmjit::x86::Gp::kIdSi), asmjit::Imm(_entry_ip));
-		// j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(RuntimeStubId::id_trace));
+	Emit_Cache();
 
 	if (bb_s != bb_ff) {
 		j.jmp(labels[bb_s->GetId()]);
@@ -224,59 +241,20 @@ void QEmit::Emit_brcc(qir::InstBrcc *ins)
 	}
 	auto cc = ins->cc;
 
-
-		// j.mov(asmjit::x86::gpq(asmjit::x86::Gp::kIdDi), R_STATE);
-		// // j.mov(asmjit::x86::gpq(asmjit::x86::Gp::kIdSi), asmjit::Imm(_entry_ip));
-		// j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(RuntimeStubId::id_trace));
 	j.emit(asmjit::x86::Inst::kIdCmp, make_operand(vs0), make_operand(vs1));
 	auto jcc = asmjit::x86::Inst::jccFromCond(make_cc(cc));
 	// j.emit(jcc, labels[bb_t->GetId()]);
-	auto jump_true = j.newLabel();
+	auto jump_bb_t= j.newLabel();
 	auto end = j.newLabel();
-	auto real_jump = j.newLabel();
-	j.emit(jcc, jump_true);
-    // j.jmp(end);
+	j.emit(jcc, jump_bb_t);
 
 	if (bb_f != bb_ff) {
-		// auto tmp0 = asmjit::x86::r12;
-		// auto tmp1 = asmjit::x86::r14;	
-		// u32 f_id = bb_f->GetId();
-		// j.mov(tmp0.r32(), f_id); // move jump target to tmp0
-		// j.lea(tmp1.r32(), asmjit::x86::ptr(0, tmp0.r64(), 2)); // tmp1 = (f_id << 2)
-		// j.and_(tmp1.r32(), ((1ull << tcache::L1_CACHE_BITS) - 1) << 4); // tmp1 = (f_id & ((1 << L1_CACHE_BITS) - 1)) << 4
-		// if (jit_mode) {
-		// 	j.mov(tmp0.r64(), (uptr)tcache::cache_tb_exec_count.data());
-		// } else {
-		// 	j.mov(tmp0.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, cache_tb_exec_count)));
-		// }
-		// j.mov(tmp0.r64(), asmjit::x86::ptr(tmp0.r64(), tmp1.r64(), 0, offsetof(tcache::BrindCacheEntry, code)));
-        // j.inc(asmjit::x86::qword_ptr(tmp0.r64(), offsetof(TBlock, flags) + 8));
+		Emit_Cache();
 		j.jmp(labels[bb_f->GetId()]);
 	}
 	j.jmp(end);
-	j.bind(jump_true);
-	auto tmp0 = asmjit::x86::rdi;
-	auto tmp1 = asmjit::x86::rsi;	
-	auto tmp2 = asmjit::x86::r12;
-	log_qcg("Emit_brcc: %08x", _entry_ip);
-	j.mov(tmp0.r64(), R_STATE);
-	j.mov(tmp1.r64(), asmjit::Imm(_entry_ip)); // move jump target to tmp0
-	// j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(RuntimeStubId::id_trace));
-	j.lea(tmp1.r32(), asmjit::x86::ptr(0, tmp1.r64(), 2)); // tmp1 = (f_id << 2)
-	j.and_(tmp1.r32(), ((1ull << tcache::L1_CACHE_BITS) - 1) << 4); // tmp1 = (f_id & ((1 << L1_CACHE_BITS) - 1)) << 4
-
-	if (jit_mode) {
-		j.mov(tmp2.r64(), (uptr)tcache::cache_tb_exec_count.data());
-	} else {
-		j.mov(tmp2.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, cache_tb_exec_count)));
-	}
-	j.cmp(asmjit::x86::ptr(tmp2.r64(), tmp1.r64(), 0, 0, sizeof(u32)), asmjit::Imm(_entry_ip));
-	j.jne(real_jump);
-	j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp1.r64(), 0, offsetof(tcache::CacheTbExecCountEntry, tb)));
-	// j.mov(tmp2.r64(), asmjit::Imm(_entry_ip));
-	// j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(RuntimeStubId::id_trace));
-	j.inc(asmjit::x86::qword_ptr(tmp2.r64(), offsetof(TBlock, flags) + 8));
-	j.bind(real_jump);
+	j.bind(jump_bb_t);
+	Emit_Cache();
 	j.jmp(labels[bb_t->GetId()]);
 
 	j.bind(end);

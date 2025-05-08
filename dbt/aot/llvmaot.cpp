@@ -16,6 +16,10 @@
 #include "llvm/Target/TargetIntrinsicInfo.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/Transforms/IPO/MergeFunctions.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar/EarlyCSE.h"
+#include "llvm/Transforms/Scalar.h"
 
 namespace dbt
 {
@@ -164,16 +168,21 @@ static void GenerateObjectFile(llvm::Module *cmodule, std::string const &filenam
 	llvm::legacy::PassManager pass;
 	auto FileType = llvm::CodeGenFileType::ObjectFile;
 
+	log_aot("adding passes to emit file");
 	if (tmachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
 		llvm::errs() << "emit objfile failed";
 		Panic();
 	}
 
+	log_aot("running passes");
+	// cmodule->print(llvm::errs(), nullptr);
+	// pass.add(llvm::createEarlyCSEPass());
 	pass.run(*cmodule);
+	// log_aot("flushing file");
 	dest.flush();
 }
 
-void LLVMAOTCompileELF(u64 threshold, char optLevel)
+void LLVMAOTCompileELF(u64 threshold, bool llvmopt)
 {
 	auto cmodule = llvm::Module("qcg_module", qir::g_llvm_ctx);
 	qir::LLVMGenCtx ctx(&cmodule);
@@ -214,6 +223,7 @@ void LLVMAOTCompileELF(u64 threshold, char optLevel)
 		, llvm::ThinOrFullLTOPhase phase // this line is for llvm 20, for 19 or below, plz comment this parameter
 		) {
 		mpm.addPass(llvm::createModuleToFunctionPassAdaptor(qir::IntrinsicExpansionPass(ctx, false)));
+
 		if constexpr (config::debug) {
 			mpm.addPass(llvm::VerifierPass());
 		}
@@ -228,7 +238,23 @@ void LLVMAOTCompileELF(u64 threshold, char optLevel)
 		}
 		log_aot("Run optimize+expand pipeline");
 		// TODO: something breaks, invalidating all analyses dont help, create pipeline again
-		llvm::ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optlevel);
+		// llvm::ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optlevel);
+		llvm::ModulePassManager mpm;
+		if (llvmopt) {
+			// First add default O3 pipeline
+			llvm::ModulePassManager defaultPM = pb.buildPerModuleDefaultPipeline(optlevel);
+			mpm.addPass(std::move(defaultPM));
+			
+			// Then add early-cse and instcombine in order, like rv32emu
+			llvm::FunctionPassManager fpm;
+			bool UseMemSSA = true;
+			fpm.addPass(llvm::EarlyCSEPass(UseMemSSA));
+			fpm.addPass(llvm::InstCombinePass());
+			mpm.addPass(llvm::createModuleToFunctionPassAdaptor(std::move(fpm)));
+		} else {
+			// If no llvmopt, just use default pipeline
+			mpm = pb.buildPerModuleDefaultPipeline(optlevel);
+		}
 		mpm.run(cmodule, mam);
 	}
 
@@ -236,6 +262,7 @@ void LLVMAOTCompileELF(u64 threshold, char optLevel)
 	AddAOTTabSection(cmodule, aot_symbols);
 
 	auto obj_path = objprof::GetCachePath(AOT_O_EXTENSION);
+	// log_aot("Generating object file: %s", obj_path.c_str());
 	GenerateObjectFile(&cmodule, obj_path);
 	// ProcessLLVMStackmaps(aot_symbols);
 	log_aot("Number of symbols: %zu", aot_symbols.size());

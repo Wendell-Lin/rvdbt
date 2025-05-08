@@ -408,14 +408,14 @@ TRANSLATOR_Helper(amomaxw);
 TRANSLATOR_Helper(amominuw);
 TRANSLATOR_Helper(amomaxuw);
 
-TRANSLATOR_Helper(mul);
-TRANSLATOR_Helper(mulh);
-TRANSLATOR_Helper(mulhsu);
-TRANSLATOR_Helper(mulhu);
-TRANSLATOR_Helper(div);
-TRANSLATOR_Helper(divu);
-TRANSLATOR_Helper(rem);
-TRANSLATOR_Helper(remu);
+// TRANSLATOR_Helper(mul);
+// TRANSLATOR_Helper(mulh);
+// TRANSLATOR_Helper(mulhsu);
+// TRANSLATOR_Helper(mulhu);
+// TRANSLATOR_Helper(div);
+// TRANSLATOR_Helper(divu);
+// TRANSLATOR_Helper(rem);
+// TRANSLATOR_Helper(remu);
 
 TRANSLATOR_Helper(csrrw);
 TRANSLATOR_Helper(csrrs);
@@ -425,12 +425,12 @@ TRANSLATOR_Helper(csrrsi);
 TRANSLATOR_Helper(csrrci);
 TRANSLATOR_Helper(mret);
 
-// TRANSLATOR_ArithmRR(mul, mul);
-// TRANSLATOR_ArithmRR(mulh, mulh);
-// TRANSLATOR_ArithmRR(mulhsu, mulhsu);
-// TRANSLATOR_ArithmRR(mulhu, mulhu);
-// TRANSLATOR_ArithmRR(div, div);
-// TRANSLATOR_ArithmRR(divu, divu);
-// TRANSLATOR_ArithmRR(rem, rem);
-// TRANSLATOR_ArithmRR(remu, remu);
+TRANSLATOR_ArithmRR(mul, mul);
+TRANSLATOR_ArithmRR(mulh, mulh);
+TRANSLATOR_ArithmRR(mulhsu, mulhsu);
+TRANSLATOR_ArithmRR(mulhu, mulhu);
+TRANSLATOR_ArithmRR(div, div);
+TRANSLATOR_ArithmRR(divu, divu);
+TRANSLATOR_ArithmRR(rem, rem);
+TRANSLATOR_ArithmRR(remu, remu);
 } // namespace dbt::qir::rv32
