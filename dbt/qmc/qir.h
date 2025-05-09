@@ -481,7 +481,9 @@ struct InstBinop : InstWithOperands<1, 2> {
 struct Block;
 
 struct InstBr : InstNoOperands {
-	InstBr() : InstNoOperands(Op::_br) {}
+	InstBr(u32 ip) : InstNoOperands(Op::_br), ip(ip) {}
+
+	u32 ip;
 };
 
 // TODO: compact and fast encoding
@@ -556,11 +558,14 @@ inline CondCode SwapCC(CondCode cc)
 }
 
 struct InstBrcc : InstWithOperands<0, 2> {
-	InstBrcc(CondCode cc_, VOperand s1, VOperand s2) : InstWithOperands(Op::_brcc, {}, {s1, s2}), cc(cc_)
+	InstBrcc(CondCode cc_, VOperand s1, VOperand s2, u32 f_ip, u32 t_ip)
+	    : InstWithOperands(Op::_brcc, {}, {s1, s2}), cc(cc_), f_ip(f_ip), t_ip(t_ip)
 	{
 	}
 
 	CondCode cc;
+	u32 f_ip;
+	u32 t_ip;
 };
 
 struct InstGBr : InstNoOperands {

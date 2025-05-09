@@ -30,7 +30,7 @@ struct alignas(8) TBlock {
 		bool is_brind_target : 1 {false};
 		bool is_segment_entry : 1 {false};
 		u64 exec_count : 64 {0};
-		u64 exec_ns : 64 {0};
+		u64 exec_instr_count : 64 {0}; // todo: impl this if exec_count is not enough
 	} flags;
 };
 

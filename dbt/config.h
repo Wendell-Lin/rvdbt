@@ -28,6 +28,10 @@ static constexpr bool dump_trace = true;
 #else
 static constexpr bool dump_trace = false;
 #endif
+// for jit
 inline bool merge_ls = false;
-inline bool brcc = false;
+inline bool brcc = true;
+// for aot
+inline bool llvmopt = true;
+inline uint64_t threshold = 1000;
 } // namespace dbt::config

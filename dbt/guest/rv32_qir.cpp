@@ -130,7 +130,7 @@ void RV32Translator::MakeGBr(u32 ip)
 {
 	auto it = ip2bb.find(ip);
 	if (it != ip2bb.end()) {
-		qb.Create_br();
+		qb.Create_br(ip);
 		qb.GetBlock()->AddSucc(it->second);
 	} else {
 		qb.Create_gbr(vconst(ip));
@@ -153,11 +153,13 @@ void RV32Translator::TranslateBrcc(rv32::insn::B i, CondCode cc)
 	};
 
 	auto bb_src = qb.GetBlock();
-	auto bb_f = make_target(insn_ip + 4);
-	auto bb_t = make_target(insn_ip + i.imm());
+	auto bb_f_ip = insn_ip + 4;
+	auto bb_t_ip = insn_ip + i.imm();
+	auto bb_f = make_target(bb_f_ip);
+	auto bb_t = make_target(bb_t_ip);
 	qb = Builder(bb_src);
 
-	qb.Create_brcc(cc, gprop(i.rs1()), gprop(i.rs2()));
+	qb.Create_brcc(cc, gprop(i.rs1()), gprop(i.rs2()), bb_f_ip, bb_t_ip);
 	qb.GetBlock()->AddSucc(bb_t);
 	qb.GetBlock()->AddSucc(bb_f);
 #else // TODO: qir cleanup pass: remove empty bb

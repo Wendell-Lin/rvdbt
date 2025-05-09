@@ -73,6 +73,8 @@ int main(int argc, char **argv)
 	if (!ParseOptions(opts, argc, argv)) {
 		return 1;
 	}
+	dbt::config::threshold = opts.threshold;
+	dbt::config::llvmopt = opts.llvmopt;
 
 	SetupLogger(opts.logs);
 	if (!opts.mgdump.empty()) {
@@ -86,7 +88,7 @@ int main(int argc, char **argv)
 	dbt::ukernel::ReproduceElfMappings(opts.elf.c_str());
 
 	if (opts.use_llvm) {
-		dbt::LLVMAOTCompileELF(opts.threshold, opts.llvmopt);
+		dbt::LLVMAOTCompileELF();
 	} else {
 		dbt::AOTCompileELF();
 	}

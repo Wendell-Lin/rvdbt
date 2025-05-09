@@ -55,18 +55,19 @@ u64 getMaxExecCountInRegion(std::vector<dbt::ModuleGraphNode *> const &region)
 	return mx_cnt;
 }
 
-static void DeclareKnownRegionEntries(qir::LLVMGenCtx *ctx, objprof::PageData const &page, u64 threshold)
+static void DeclareKnownRegionEntries(qir::LLVMGenCtx *ctx, objprof::PageData const &page)
 {
 	u32 const page_vaddr = page.pageno << mmu::PAGE_BITS;
 	qir::CodeSegment segment(page_vaddr, mmu::PAGE_SIZE);
 
 	for (u32 idx = 0; idx < page.executed.size(); ++idx) {
 		// if (!page.executed[idx]) 
-		if (!page.executed[idx] || page.exec_count[idx] < threshold)
+		if (!page.executed[idx] || page.exec_count[idx] < dbt::config::threshold)
 		{
 			continue;
 		}
-		if (page.brind_target[idx] || page.segment_entry[idx]) {
+		if (page.brind_target[idx] || page.segment_entry[idx]) 
+		{
 			u32 ip = page_vaddr + objprof::PageData::idx2po(idx);
 			ctx->AddFunction(ip, segment);
 		}
@@ -74,20 +75,20 @@ static void DeclareKnownRegionEntries(qir::LLVMGenCtx *ctx, objprof::PageData co
 }
 
 static void LLVMAOTTranslatePage(qir::LLVMGenCtx *ctx, std::vector<AOTSymbol> *aot_symbols,
-				 objprof::PageData const &page, u64 threshold)
+				 objprof::PageData const &page)
 {
 	auto mg = BuildModuleGraph(page);
 	auto regions = mg.ComputeRegions();
 
 	for (auto const &r : regions) {
-		if (getMaxExecCountInRegion(r) < threshold)
+		if (getMaxExecCountInRegion(r) < dbt::config::threshold)
 			continue;
 		ctx->AddFunction(r[0]->ip, mg.segment);
 	}
 
 	for (auto const &r : regions) {
 		assert(r[0]->flags.region_entry);
-		if (getMaxExecCountInRegion(r) < threshold)
+		if (getMaxExecCountInRegion(r) < dbt::config::threshold)
 			continue;
 		log_aot("Compiling region with 1st ip: %x", r[0]->ip);
 		qir::CompilerJob::IpRangesSet ipranges;
@@ -182,7 +183,7 @@ static void GenerateObjectFile(llvm::Module *cmodule, std::string const &filenam
 	dest.flush();
 }
 
-void LLVMAOTCompileELF(u64 threshold, bool llvmopt)
+void LLVMAOTCompileELF()
 {
 	auto cmodule = llvm::Module("qcg_module", qir::g_llvm_ctx);
 	qir::LLVMGenCtx ctx(&cmodule);
@@ -190,10 +191,10 @@ void LLVMAOTCompileELF(u64 threshold, bool llvmopt)
 	std::vector<AOTSymbol> aot_symbols;
 	aot_symbols.reserve(64_KB);
 	for (auto const &page : objprof::GetProfile()) {
-		DeclareKnownRegionEntries(&ctx, page, threshold);
+		DeclareKnownRegionEntries(&ctx, page);
 	}
 	for (auto const &page : objprof::GetProfile()) {
-		LLVMAOTTranslatePage(&ctx, &aot_symbols, page, threshold);
+		LLVMAOTTranslatePage(&ctx, &aot_symbols, page);
 	}
 	assert(!verifyModule(cmodule, &llvm::errs()));
 
@@ -240,7 +241,7 @@ void LLVMAOTCompileELF(u64 threshold, bool llvmopt)
 		// TODO: something breaks, invalidating all analyses dont help, create pipeline again
 		// llvm::ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optlevel);
 		llvm::ModulePassManager mpm;
-		if (llvmopt) {
+		if (dbt::config::llvmopt) {
 			// First add default O3 pipeline
 			llvm::ModulePassManager defaultPM = pb.buildPerModuleDefaultPipeline(optlevel);
 			mpm.addPass(std::move(defaultPM));

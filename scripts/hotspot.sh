@@ -3,7 +3,6 @@ python3 examples/benchmarks.py \
     --libriscv-build-dir /home/wendell/libriscv/emulator \
     --prebuilts $(pwd)/prebuilts \
     --riscv32-gcc riscv32-unknown-elf-gcc \
-    --rvdbt-jit-no-brcc \
     --rvdbt-jit-merge-ls \
     --rvdbt-llvmaot-hotspot
     # --rvdbt-qcgaot \

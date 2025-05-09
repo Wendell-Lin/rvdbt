@@ -286,7 +286,7 @@ def GetBenchmarks_RV32EMU(prebuilts_dir):
     # b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
     # b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
     # b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
-    b.append(Benchmark(root + "/", ["dhrystone"]))
+    # b.append(Benchmark(root + "/", ["dhrystone"]))
     # b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
     b.append(Benchmark(root + "/", ["sha512"]))
     return b
@@ -409,18 +409,16 @@ def RunTests(opts):
             execs.append(RVDBTExec(False, brcc=False, jit_merge_ls=False))  # JIT mode
         if opts.rvdbt_jit_no_brcc:
             execs.append(RVDBTExec(False, brcc=False, jit_merge_ls=True))  # JIT mode
-        if opts.rvdbt_llvmaot_hotspot:
-            execs.append(RVDBTExec(True, llvm=True, hotspot_threshold=100))  # JIT merge ls mode
         if opts.rvdbt_jit_merge_ls:
             execs.append(RVDBTExec(False, brcc=True, jit_merge_ls=True))  # JIT merge ls mode
         if opts.rvdbt_llvmaot_hotspot:
-            execs.append(RVDBTExec(True, llvm=True, hotspot_threshold=101))  # JIT merge ls mode
+            execs.append(RVDBTExec(True, llvm=True, hotspot_threshold=10))  # JIT merge ls mode
         if opts.rvdbt_qcgaot:
             execs.append(RVDBTExec(True, False))  # QCG AOT
         if opts.rvdbt_llvmaot:
             execs.append(RVDBTExec(True, True))  # LLVM AOT
         if opts.rvdbt_llvmaot_1000:
-            execs.append(RVDBTExec(True, True, 1000))  # LLVM AOT with hotspot threshold
+            execs.append(RVDBTExec(True, True, 10))  # LLVM AOT with hotspot threshold
         if opts.rvdbt_llvmaot_opt:
             execs.append(RVDBTExec(True, True, 1000, llvmopt=True))  # LLVM AOT with optimization
         if opts.libriscv:

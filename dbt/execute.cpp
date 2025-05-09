@@ -84,6 +84,9 @@ void Execute(CPUState *state)
 			tcache::CacheBrind(tb);
 		}
 
+		if (tb->flags.exec_instr_count == 0) {
+			tb->flags.exec_instr_count = (u64) tb->tcode.size;
+		}
 		tb->flags.exec_count += 1;
 		branch_slot = jitabi::trampoline_to_jit(state, mmu::base, tb->tcode.ptr);
 	}

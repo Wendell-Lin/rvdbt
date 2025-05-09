@@ -31,7 +31,7 @@ ModuleGraph BuildModuleGraph(objprof::PageData const &page)
 			mg.RecordSegmentEntry(ip);
 		}
 		if (page.exec_count[idx] > 0) {
-			mg.RecordExec(ip, page.exec_ns[idx], page.exec_count[idx]);
+			mg.RecordExec(ip, page.exec_instr_count[idx], page.exec_count[idx]);
 		}
 	}
 

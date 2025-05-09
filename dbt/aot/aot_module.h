@@ -36,7 +36,7 @@ struct ModuleGraphNode {
 		bool region_entry : 1 {false};
 		bool is_brind_source : 1 {false};
 		bool is_crosssegment_br : 1 {false};
-		u64 exec_ns{0};
+		u64 exec_instr_count{0};
 		u64 exec_count{0};
 	} flags;
 
@@ -108,10 +108,10 @@ struct ModuleGraph {
 		root->AddSucc(node);
 	}
 
-	void RecordExec(u32 ip, u64 exec_ns, u64 exec_count)
+	void RecordExec(u32 ip, u64 exec_instr_count, u64 exec_count)
 	{
 		auto *node = GetNode(ip);
-		node->flags.exec_ns = exec_ns;
+		node->flags.exec_instr_count = exec_instr_count;
 		node->flags.exec_count = exec_count;
 	}
 
