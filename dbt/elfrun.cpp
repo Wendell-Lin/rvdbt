@@ -17,6 +17,7 @@ struct ElfRunOptions {
 	std::string cache{};
 	bool use_aot{};
 	bool merge_ls{};
+	bool brcc{};
 	std::string logs{};
 };
 
@@ -60,7 +61,8 @@ static bool ParseOptions(ElfRunOptions &o, int argc, char **argv)
 	    ("fsroot", bpo::value(&o.fsroot)->required(), "isolated path for emulated process")
 	    ("cache",  bpo::value(&o.cache)->required(), "dbt cache path")
 	    ("aot",    bpo::value(&o.use_aot)->default_value(false), "boot aot file if available")
-	    ("merge-ls", bpo::value(&o.merge_ls)->default_value(false), "merge load/store instructions");
+	    ("merge-ls", bpo::value(&o.merge_ls)->default_value(false), "merge load/store instructions")
+	    ("brcc", bpo::value(&o.brcc)->default_value(false), "enable brcc cache");
 	// clang-format on
 
 	try {
@@ -101,7 +103,8 @@ int main(int argc, char **argv)
 	}
 	auto gargs = opts.guest_args;
 	dbt::config::merge_ls = opts.merge_ls;
-
+	dbt::config::brcc = opts.brcc;
+	
 	SetupLogger(opts.logs);
 
 	dbt::fsmanager::Init(opts.cache.c_str());

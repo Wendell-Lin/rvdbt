@@ -72,6 +72,7 @@ private:
 
 	std::vector<asmjit::Label> labels;
 	u32 _entry_ip;
+	u32 _entry_ip_hash;
 };
 
 }; // namespace dbt::qcg

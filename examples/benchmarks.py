@@ -105,7 +105,7 @@ class LIBRISCVExec(BaseExec):
 class RVDBTExec(BaseExec):
     build_dir = None
 
-    def __init__(self, aot, llvm=False, hotspot_threshold=0, jit_merge_ls=False, llvmopt=False):
+    def __init__(self, aot, llvm=False, hotspot_threshold=0, jit_merge_ls=False, llvmopt=False, brcc=True):
         super().__init__()
         self.name = "rvdbt-" + ("jit", ("qcgaot", "llvmaot")[llvm])[aot] + ("", "-opt")[llvmopt]
         if jit_merge_ls:
@@ -117,6 +117,7 @@ class RVDBTExec(BaseExec):
         self.hotspot_threshold = hotspot_threshold
         self.jit_merge_ls = jit_merge_ls
         self.llvmopt = llvmopt
+        self.brcc = brcc
     def setup(self, root, cmd):
         super().setup(root, cmd)
         if not self.aot:
@@ -144,6 +145,7 @@ class RVDBTExec(BaseExec):
                  "--fsroot=" + self.root]
         if self.aot:
             pargs += ["--logs=aot"]
+        pargs += ["--brcc=" + ("off", "on")[self.brcc]]
         pargs += ["--aot=" + ("off", "on")[self.aot]]
         pargs += ["--merge-ls=" + ("off", "on")[self.jit_merge_ls]]
         pargs += ["--"] + self.args
@@ -181,7 +183,7 @@ class Benchmark:
             exec.ofile = self.ofile
         if "rvdbt-llvmaot" in exec.name: # if setup with elfaot and success, then change the modulegraph.gv into name
             print(f"Renaming modulegraph.gv `to {self.name}.gv")
-            os.rename(RVDBTExec.build_dir + "/logs/modulegraph.gv", RVDBTExec.build_dir + "/logs/" + self.name + ".gv")
+            os.rename(RVDBTExec.build_dir + "/logs/modulegraph.gv", RVDBTExec.build_dir + "/logs/" + self.name + "_" + exec.name + ".gv")
         exec.run()
         if self.ofile is not None and os.path.isfile(self.ofile):
             os.rename(self.ofile, self.get_ofile(exec))
@@ -277,15 +279,15 @@ def GetBenchmarks_Coremark(prebuilts_dir):
 def GetBenchmarks_RV32EMU(prebuilts_dir):
     b: list[Benchmark] = []
     root = os.path.join(prebuilts_dir + "/rv32emu-workload")
-    b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
-    b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
-    b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
-    b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
-    b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
+    # b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
+    # b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
+    # b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
+    # b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
+    # b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
     # b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
-    b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
+    # b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
     b.append(Benchmark(root + "/", ["dhrystone"]))
-    b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
+    # b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
     b.append(Benchmark(root + "/", ["sha512"]))
     return b
 
@@ -308,15 +310,15 @@ def GetBenchmarks_RV32IA(prebuilts_dir):
 def GetBenchmarks_RV32I(prebuilts_dir):
     b: list[Benchmark] = []
     root = os.path.join(prebuilts_dir + "/rv32emu-i")
-    b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
-    b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
-    b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
-    b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
-    b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
-    b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
-    b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
+    # b.append(Benchmark(root + "/", ["nbench", "0"], name="numeric-sort"))
+    # b.append(Benchmark(root + "/", ["nbench", "1"], name="string-sort"))
+    # b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
+    # b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
+    # b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
+    # b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
+    # b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
     b.append(Benchmark(root + "/", ["dhrystone"]))
-    b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
+    # b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
     b.append(Benchmark(root + "/", ["sha512"], cmp_out=True))
     return b
 
@@ -404,9 +406,15 @@ def RunTests(opts):
     def get_execs(): 
         execs = [QEMUExec()]  # QEMU is always included as reference
         if opts.rvdbt_jit:
-            execs.append(RVDBTExec(False))  # JIT mode
+            execs.append(RVDBTExec(False, brcc=False, jit_merge_ls=False))  # JIT mode
+        if opts.rvdbt_jit_no_brcc:
+            execs.append(RVDBTExec(False, brcc=False, jit_merge_ls=True))  # JIT mode
+        if opts.rvdbt_llvmaot_hotspot:
+            execs.append(RVDBTExec(True, llvm=True, hotspot_threshold=100))  # JIT merge ls mode
         if opts.rvdbt_jit_merge_ls:
-            execs.append(RVDBTExec(False, jit_merge_ls=True))  # JIT merge ls mode
+            execs.append(RVDBTExec(False, brcc=True, jit_merge_ls=True))  # JIT merge ls mode
+        if opts.rvdbt_llvmaot_hotspot:
+            execs.append(RVDBTExec(True, llvm=True, hotspot_threshold=101))  # JIT merge ls mode
         if opts.rvdbt_qcgaot:
             execs.append(RVDBTExec(True, False))  # QCG AOT
         if opts.rvdbt_llvmaot:
@@ -457,12 +465,14 @@ def main():
     op.add_option("--libriscv-build-dir", dest="libriscv_build_dir")
     op.add_option("--prebuilts", dest="prebuilts_dir")
     # Add new options for execution modes
+    op.add_option("--rvdbt-jit-no-brcc", action="store_true", dest="rvdbt_jit_no_brcc", default=False)
     op.add_option("--rvdbt-jit", action="store_true", dest="rvdbt_jit", default=False)
     op.add_option("--rvdbt-jit-merge-ls", action="store_true", dest="rvdbt_jit_merge_ls", default=False)
     op.add_option("--rvdbt-qcgaot", action="store_true", dest="rvdbt_qcgaot", default=False)
     op.add_option("--rvdbt-llvmaot", action="store_true", dest="rvdbt_llvmaot", default=False)
     op.add_option("--rvdbt-llvmaot-1000", action="store_true", dest="rvdbt_llvmaot_1000", default=False)
     op.add_option("--rvdbt-llvmaot-opt", action="store_true", dest="rvdbt_llvmaot_opt", default=False)
+    op.add_option("--rvdbt-llvmaot-hotspot", action="store_true", dest="rvdbt_llvmaot_hotspot", default=False)
     op.add_option("--libriscv", action="store_true", dest="libriscv", default=False)
     # set objective to "benchmark" or "test"
     op.add_option("--objective", dest="objective", type="choice", 

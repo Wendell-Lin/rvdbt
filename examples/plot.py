@@ -18,17 +18,35 @@ def process_benchmark_data():
 # dhrystone,1.000,0.864,0.839,2.374,1.348
 # primes,1.000,1.003,0.978,1.837,1.100
 # sha512,1.000,0.588,0.525,2.319,1.022"""
-    data = """benchmark-name,qemu,rvdbt-jit,rvdbt-jit-merge-ls,rvdbt-llvmaot,rvdbt-llvmaot-hotspot-1000
-numeric-sort,1.000,1.324,1.339,2.137,1.345
-string-sort,1.000,0.998,1.005,3.196,1.010
-bitfield,1.000,0.678,0.702,2.033,0.702
-emfloat,1.000,0.956,0.953,4.351,2.146
-assignment,1.000,1.267,1.212,2.197,1.692
-IDEA,1.000,1.201,1.520,3.232,1.249
-Huffman,1.000,1.277,1.274,2.526,1.279
-dhrystone,1.000,0.853,1.028,2.414,1.717
-primes,1.000,1.011,0.997,1.534,1.000
-sha512,1.000,0.583,0.603,2.534,2.028"""
+#     data = """benchmark-name,qemu,rvdbt-jit,rvdbt-jit-merge-ls,rvdbt-llvmaot,rvdbt-llvmaot-hotspot-1000
+# numeric-sort,1.000,1.324,1.339,2.137,1.345
+# string-sort,1.000,0.998,1.005,3.196,1.010
+# bitfield,1.000,0.678,0.702,2.033,0.702
+# emfloat,1.000,0.956,0.953,4.351,2.146
+# assignment,1.000,1.267,1.212,2.197,1.692
+# IDEA,1.000,1.201,1.520,3.232,1.249
+# Huffman,1.000,1.277,1.274,2.526,1.279
+# dhrystone,1.000,0.853,1.028,2.414,1.717
+# primes,1.000,1.011,0.997,1.534,1.000
+# sha512,1.000,0.583,0.603,2.534,2.028"""
+#     data="""benchmark-name,qemu,rvdbt-jit-merge-ls,rvdbt-llvmaot,rvdbt-llvmaot-hotspot-1000,rvdbt-llvmaot-opt
+# numeric-sort,1.000,1.179,1.927,1.953,1.949
+# string-sort,1.000,0.779,3.371,3.315,3.326
+# bitfield,1.000,0.955,2.001,2.000,2.001
+# emfloat,1.000,0.803,4.335,4.288,4.310
+# assignment,1.000,0.779,2.088,2.137,2.135
+# Huffman,1.000,1.059,2.525,2.488,2.485
+# dhrystone,1.000,0.948,2.455,1.752,1.754
+# sha512,1.000,0.583,2.656,2.113,2.115"""
+    data="""benchmark-name,qemu,rvdbt-jit,rvdbt-jit-merge-ls,rvdbt-jit-brcc,rvdbt-llvmaot,rvdbt-llvmaot-hotspot-1000,rvdbt-llvmaot-opt
+numeric-sort,1.000,1.230,1.230,1.188,1.922,1.949,1.946
+string-sort,1.000,1.001,1.000,0.792,3.378,3.320,3.317
+bitfield,1.000,1.039,1.035,0.934,2.006,2.007,2.002
+emfloat,1.000,0.874,0.883,0.843,4.374,4.312,4.317
+assignment,1.000,1.050,1.058,0.827,2.093,2.143,2.132
+Huffman,1.000,1.122,1.164,1.069,2.496,2.517,2.532
+dhrystone,1.000,0.823,1.014,0.974,2.426,1.738,1.738
+sha512,1.000,0.579,0.600,0.592,2.595,2.118,2.121"""
 #     data = """benchmark-name,qemu,rvdbt-jit,rvdbt-qcgaot,rvdbt-llvmaot,rvlinux-bt
 # sha512,1.000,0.583,0.520,2.550,1.039"""
 #     data = """benchmark-name,qemu,rvlinux-bt
@@ -70,7 +88,7 @@ def plot_benchmark_comparison(df, output_path='benchmark_comparison.png'):
     positions = [np.arange(len(df['benchmark-name'])) + (n_executors - 1 - i) * bar_height for i in range(n_executors)]
 
     # Color scheme
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#8c564b', '#d62728', '#9467bd', '#e377c2']
 
     # Create horizontal bars
     for i, (executor, color) in enumerate(zip(executors, colors)):

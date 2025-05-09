@@ -153,6 +153,7 @@ void QEmit::Prologue(u32 ip)
 {
 	// j.int3();
 	_entry_ip = ip;
+	_entry_ip_hash = tcache::l1hash(ip) << 4;
 	FrameSetup();
 }
 
@@ -199,9 +200,10 @@ void QEmit::Emit_Cache()
 	auto tmp2 = asmjit::x86::r12;
 	log_qcg("Emit_brcc: %08x", _entry_ip);
 	j.mov(tmp0.r64(), R_STATE);
-	j.mov(tmp1.r64(), asmjit::Imm(_entry_ip)); // move jump target to tmp0
-	j.lea(tmp1.r32(), asmjit::x86::ptr(0, tmp1.r64(), 2)); // tmp1 = (f_id << 2)
-	j.and_(tmp1.r32(), ((1ull << tcache::L1_CACHE_BITS) - 1) << 4); // tmp1 = (f_id & ((1 << L1_CACHE_BITS) - 1)) << 4
+	// j.mov(tmp1.r64(), asmjit::Imm(_entry_ip)); // move jump target to tmp0
+	// j.lea(tmp1.r32(), asmjit::x86::ptr(0, tmp1.r64(), 2)); // tmp1 = (f_id << 2)
+	// j.and_(tmp1.r32(), ((1ull << tcache::L1_CACHE_BITS) - 1) << 4); // tmp1 = (f_id & ((1 << L1_CACHE_BITS) - 1)) << 4
+	j.mov(tmp1.r32(), _entry_ip_hash);
 
 	if (jit_mode) {
 		j.mov(tmp2.r64(), (uptr)tcache::cache_tb_exec_count.data());
@@ -217,7 +219,8 @@ void QEmit::Emit_br(qir::InstBr *ins)
 	auto bb_s = bb->GetSuccs().at(0);
 	auto bb_ff = &*++bb->getIter();
 
-	Emit_Cache();
+	if (dbt::config::brcc)
+		Emit_Cache();
 
 	if (bb_s != bb_ff) {
 		j.jmp(labels[bb_s->GetId()]);
@@ -249,12 +252,14 @@ void QEmit::Emit_brcc(qir::InstBrcc *ins)
 	j.emit(jcc, jump_bb_t);
 
 	if (bb_f != bb_ff) {
-		Emit_Cache();
+		if (dbt::config::brcc)
+			Emit_Cache();
 		j.jmp(labels[bb_f->GetId()]);
 	}
 	j.jmp(end);
 	j.bind(jump_bb_t);
-	Emit_Cache();
+	if (dbt::config::brcc)
+		Emit_Cache();
 	j.jmp(labels[bb_t->GetId()]);
 
 	j.bind(end);
