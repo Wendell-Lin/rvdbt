@@ -82,9 +82,12 @@ HELPER_ASM void qcgstub_escape_brind()
 // Caller uses 2nd value in returned pair as jump target
 static ALWAYS_INLINE _RetPair TryLinkBranch(CPUState *state, ppoint::BranchSlot *slot)
 {
+	// if (dbt::config::trace) {
+	// 	state->DumpTraceCache(slot->gip, state->ip);
+	// }
 	auto found = tcache::Lookup(slot->gip);
 	if (likely(found)) {
-		found->flags.exec_count += 1;
+		// found->flags.exec_count += 1;
 		slot->Link(found->tcode.ptr);
 		tcache::RecordLink(slot, found, slot->flags.cross_segment);
 		tcache::CacheBr(found);
@@ -127,7 +130,6 @@ HELPER_ASM void qcgstub_link_branch_llvmaot()
 
 HELPER _RetPair qcg_TryLinkBranchJIT(CPUState *state, void *retaddr)
 {
-	log_dbt("TryLinkBranchJIT: %p", retaddr);
 	return TryLinkBranch(state, ppoint::BranchSlot::FromCallPtrRetaddr(retaddr));
 }
 
@@ -145,6 +147,9 @@ HELPER _RetPair qcg_TryLinkBranchLLVMAOT(CPUState *state, void *retaddr, uptr in
 // Indirect branch slowpath
 HELPER void *qcgstub_brind(CPUState *state, u32 gip)
 {
+	// if (dbt::config::trace) {
+	// 	state->DumpTraceCache(gip, state->ip);
+	// }
 	state->ip = gip;
 	auto *found = tcache::Lookup(gip);
 	if (likely(found)) {
@@ -188,7 +193,7 @@ HELPER_ASM void qcgstub_trace()
 
 	asm("pushq	%r13\n\t"
 	    "movq	%r13, %rdi\n\t" // STATE
-	    "subq	$16, %rsp\n\t"
+	    "subq	$16, %rsp\n\t" // TODO: figure out 16 or 8, sometime only one work.
 	    "callq	qcg_DumpTrace@plt\n\t"
 	    "addq	$16, %rsp\n\t"
 	    "popq	%r13\n\t");
@@ -196,6 +201,28 @@ HELPER_ASM void qcgstub_trace()
 	asm(POP_NONCSR_GPR());
 	asm("retq	\n\t");
 }
+
+HELPER_ASM void qcgstub_trace_cache()
+{
+	asm(PUSH_NONCSR_GPR());
+
+	asm("pushq	%r13\n\t"
+	    "movq	%r13, %rdi\n\t" // STATE
+	    "pushq	%r14\n\t"
+	    "movq	%r14, %rsi\n\t" // gip
+	    "pushq	%r15\n\t"
+	    "movq	%r15, %rdx\n\t" // entry_ip
+	    "subq	$8, %rsp\n\t"
+	    "callq	qcg_DumpTraceCache@plt\n\t"
+	    "addq	$8, %rsp\n\t"
+	    "popq	%r15\n\t"
+	    "popq	%r14\n\t"
+	    "popq	%r13\n\t");
+
+	asm(POP_NONCSR_GPR());
+	asm("retq	\n\t");
+}
+
 static_assert(qcg::ArchTraits::STATE == asmjit::x86::Gp::kIdR13);
 
 struct TraceRing {
@@ -234,4 +261,10 @@ HELPER void qcg_DumpTrace(CPUState *state)
 	state->DumpTrace("entry");
 }
 
+HELPER void qcg_DumpTraceCache(CPUState *state, u32 gip, u32 entry_ip)
+{
+	// log_dbt("DumpTraceCache called with state=%p, gip=%08x", state, gip);
+	// log_dbt("DumpTraceCache from %08x to %08x", state->ip, gip);
+	state->DumpTraceCache(gip, entry_ip);
+}
 } // namespace dbt::jitabi

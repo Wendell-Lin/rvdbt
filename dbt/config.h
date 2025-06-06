@@ -30,8 +30,11 @@ static constexpr bool dump_trace = false;
 #endif
 // for jit
 inline bool merge_ls = false;
-inline bool brcc = true;
+inline bool trace = true; // trace execution count more detailed
+inline bool use_aot = false;
+inline bool dump_time = false;
 // for aot
-inline bool llvmopt = true;
+inline bool llvmopt = false;
 inline uint64_t threshold = 1000;
+inline bool cross_segment_branch = false;
 } // namespace dbt::config

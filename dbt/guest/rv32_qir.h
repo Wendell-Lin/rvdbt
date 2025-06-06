@@ -18,7 +18,7 @@ struct RV32Translator {
 	RV32_OPCODE_LIST()
 #undef OP
 
-	static void Translate(qir::Region *region, CompilerJob::IpRangesSet *ipranges, uptr vmem);
+	static u32 Translate(qir::Region *region, CompilerJob::IpRangesSet *ipranges, uptr vmem);
 
 	static StateInfo const *const state_info;
 
@@ -26,7 +26,7 @@ private:
 	static StateInfo const *GetStateInfo();
 
 	explicit RV32Translator(qir::Region *region, uptr vmem);
-	void TranslateIPRange(u32 ip, u32 boundary_ip);
+	u32 TranslateIPRange(u32 ip, u32 boundary_ip);
 	void PreSideeff();
 	void TranslateInsn();
 

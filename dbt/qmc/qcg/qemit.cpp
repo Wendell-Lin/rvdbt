@@ -193,30 +193,46 @@ void QEmit::Emit_hcall(qir::InstHcall *ins)
 	j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(ins->stub));
 }
 
-void QEmit::Emit_Cache(u32 bb_ip)
+void QEmit::Emit_Cache(u32 target_ip)
 {
-	if (!dbt::config::brcc)
+	if (dbt::config::use_aot) {
 		return;
+	}
 	auto skip_cache = j.newLabel();
-	auto tmp0 = asmjit::x86::rdi;
+	// auto tmp0 = asmjit::x86::rdi;
 	auto tmp1 = asmjit::x86::rsi;	
 	auto tmp2 = asmjit::x86::r12;
-	log_dbt("Emit_Cache from %08x to %08x", _entry_ip, bb_ip);
+	log_dbt("Emit_Cache from %08x to %08x", _entry_ip, target_ip);
 
 	if (jit_mode) {
 		j.mov(tmp2.r64(), (uptr)tcache::cache_tb_exec_count.data());
 	} else {
 		j.mov(tmp2.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, cache_tb_exec_count)));
 	}
-	j.mov(tmp1.r64(), bb_ip); // move jump target to tmp0
-	j.lea(tmp1.r32(), asmjit::x86::ptr(0, tmp1.r64(), 2)); // tmp1 = (f_id << 2)
+	j.mov(tmp1.r32(), target_ip); // move jump target to tmp0
+	j.lea(tmp1.r32(), asmjit::x86::ptr(0, tmp1.r32(), 2)); // tmp1 = (f_id << 2)
 	j.and_(tmp1.r32(), ((1ull << tcache::L1_CACHE_BITS) - 1) << 4); // tmp1 = (f_id & ((1 << L1_CACHE_BITS) - 1)) << 4
-	j.cmp(asmjit::x86::ptr(tmp2.r64(), tmp1.r64(), 0, 0, sizeof(u32)), bb_ip);
+	j.cmp(asmjit::x86::ptr(tmp2.r64(), tmp1.r32(), 0, 0, sizeof(u32)), target_ip);
 	// j.mov(tmp1.r32(), _entry_ip_hash);
 	j.jne(skip_cache);
-	j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp1.r64(), 0, offsetof(tcache::CacheTbExecCountEntry, tb)));
+	j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp1.r32(), 0, offsetof(tcache::CacheTbExecCountEntry, tb), sizeof(u64)));
 	j.inc(asmjit::x86::qword_ptr(tmp2.r64(), offsetof(TBlock, flags) + 8));
 	j.bind(skip_cache);
+	if (dbt::config::trace) {
+		j.mov(asmjit::x86::r14, target_ip);
+		j.mov(asmjit::x86::r15, _entry_ip);
+		if (is_leaf) {
+			j.push(asmjit::x86::rcx);
+		}
+
+		j.emit(asmjit::x86::Inst::kIdCall, make_stubcall_target(RuntimeStubId::id_trace_cache));
+
+		if (is_leaf) {
+			j.pop(asmjit::x86::rcx);
+		} else {
+			FrameDestroy();
+		}
+	}
 }
 
 void QEmit::Emit_br(qir::InstBr *ins)
@@ -254,13 +270,17 @@ void QEmit::Emit_brcc(qir::InstBrcc *ins)
 	auto end = j.newLabel();
 	j.emit(jcc, jump_bb_t);
 
-	Emit_Cache(ins->f_ip);
+	// false path
+	if (!ins->f_gbr) // not gbr, we must count here.
+		Emit_Cache(ins->f_ip);
 	if (bb_f != bb_ff) {
 		j.jmp(labels[bb_f->GetId()]);
 	}
 	j.jmp(end);
 	j.bind(jump_bb_t);
-	Emit_Cache(ins->t_ip);
+	// true path
+	if (!ins->t_gbr) // not gbr, we must count here.
+		Emit_Cache(ins->t_ip);
 	j.jmp(labels[bb_t->GetId()]);
 
 	j.bind(end);
@@ -268,6 +288,10 @@ void QEmit::Emit_brcc(qir::InstBrcc *ins)
 
 void QEmit::Emit_gbr(qir::InstGBr *ins)
 {
+	// Even LinkLazyJIT is called, and it looks like always TryLinkBranch.
+	// But the call path is different after first found, so TryLinkBranch is not called again.
+	// So we just emit cache to profile here.
+	Emit_Cache(ins->tpc.GetConst());
 	FrameDestroy();
 	static constexpr size_t patch_size = sizeof(jitabi::ppoint::BranchSlot);
 	j.embedUInt8(0, patch_size);
@@ -287,15 +311,13 @@ void QEmit::Emit_gbrind(qir::InstGBrind *ins)
 	assert(ptgt.id() == asmjit::x86::Gp::kIdSi);
 
 	auto slowpath = j.newLabel();
-	// if constexpr (false)
+	
 	{
 		// commented the original 
 		// Inlined l1_brind_cache lookup
 		auto tmp0 = asmjit::x86::rdi;
 		auto tmp1 = asmjit::x86::rdx;
 		auto tmp2 = asmjit::x86::r12;
-		// auto tmp1 = asmjit::x86::r12;
-		// auto tmp2 = asmjit::x86::r14;
 
 		if (jit_mode) {
 			j.mov(tmp1.r64(), (uptr)tcache::l1_brind_cache.data());
@@ -318,9 +340,12 @@ void QEmit::Emit_gbrind(qir::InstGBrind *ins)
 		} else {
 			j.mov(tmp2.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, cache_tb_exec_count)));
 		}
-		j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp0.r64(), 0, offsetof(tcache::BrindCacheEntry, code)));
-		// todo: this 8 is computed from the size of the flags to exec count, should be changed to another offsetof.
-        j.inc(asmjit::x86::qword_ptr(tmp2.r64(), offsetof(TBlock, flags) + 8));
+		// j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp0.r64(), 0, offsetof(tcache::BrindCaxwcheEntry, code)));
+		if (!dbt::config::use_aot) {
+			j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp0.r64(), 0, offsetof(tcache::CacheTbExecCountEntry, tb), sizeof(u64)));
+			// todo: this 8 is computed from the size of the flags to exec count, should be changed to another offsetof.
+			j.inc(asmjit::x86::qword_ptr(tmp2.r64(), offsetof(TBlock, flags) + 8));
+		}
 
 		j.jmp(asmjit::x86::ptr(tmp1.r64(), tmp0.r64(), 0, offsetof(tcache::BrindCacheEntry, code),
 				       sizeof(u64)));
@@ -736,3 +761,4 @@ void QEmit::Emit_remu(qir::InstBinop *ins)
 }
 
 } // namespace dbt::qcg
+

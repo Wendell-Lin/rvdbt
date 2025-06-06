@@ -6,6 +6,8 @@
 #include <alloca.h>
 #include <cstring>
 #include <memory>
+#include <vector>
+#include <sstream>
 
 #include "dbt/ukernel_syscalls.h"
 
@@ -23,9 +25,15 @@ extern "C" {
 #include <sys/syscall.h>
 #include <sys/sysinfo.h>
 #include <sys/time.h>
+#include <sys/times.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/prctl.h>
+#include <sys/uio.h>
 #include <unistd.h>
+#include <dirent.h>
 };
 
 namespace dbt
@@ -46,6 +54,7 @@ struct ukernel::Process {
 	std::unique_ptr<uthread> main_thread{};
 
 	std::string fsroot;
+	std::string guest_cwd;  // Guest's view of current working directory (absolute path)
 	int exe_fd{-1};
 	uabi_ulong brk{};
 };
@@ -196,52 +205,74 @@ void ukernel::SetFSRoot(const char *fsroot_)
 		Panic("failed to resolve fsroot");
 	}
 	process.fsroot = std::string(buf) + "/";
+	process.guest_cwd = "/";  // Initialize guest cwd to root
 }
 
 static int PathResolution(int dirfd, char const *path, char *resolved)
 {
 	char rp_buf[PATH_MAX];
-
-	log_ukernel("start path resolution: %s", path);
+	
+	log_ukernel("path resolution: input path='%s', fsroot='%s', guest_cwd='%s', dirfd=%d", 
+		path, ukernel::process.fsroot.c_str(), ukernel::process.guest_cwd.c_str(), dirfd);
 	auto const &fsroot = ukernel::process.fsroot;
 
-	if (path[0] == '/') {
-		snprintf(rp_buf, sizeof(rp_buf), "%s/%s", fsroot.c_str(), path);
-	} else {
-		if (dirfd == AT_FDCWD) {
-			getcwd(rp_buf, sizeof(rp_buf));
-		} else {
-			char fdpath[64];
-			sprintf(fdpath, "/proc/self/fd/%d", dirfd);
-			if (readlink(fdpath, rp_buf, sizeof(rp_buf)) < 0) {
-				log_ukernel("bad dirfd");
-				return -1;
-			}
-		}
-		size_t pref_sz = strlen(rp_buf);
-		strncpy(rp_buf + pref_sz, path, sizeof(rp_buf) - pref_sz);
-	}
-	if (strncmp(rp_buf, fsroot.c_str(), fsroot.length())) {
-		Panic("escaped fsroot");
-	}
-
-	if (HandleSpecialPath(rp_buf + fsroot.length() + 1, resolved) > 0) {
+	// Special case handling first
+	if (HandleSpecialPath(path, resolved) > 0) {
 		return 0;
 	}
 
-	// TODO: make it preceise, resolve "/.." and symlinks
+	// Handle absolute and relative paths
+	if (path[0] == '/') {
+		// For absolute paths, treat them as relative to fsroot
+		snprintf(rp_buf, sizeof(rp_buf), "%s", path);
+	} else {
+		// For relative paths with AT_FDCWD, treat as relative to fsroot
+		if (dirfd == AT_FDCWD) {
+			snprintf(rp_buf, sizeof(rp_buf), "%s%s", fsroot.c_str(), path);
+		} else {
+			char fdpath[64];
+			sprintf(fdpath, "/proc/self/fd/%d", dirfd);
+			ssize_t len = readlink(fdpath, rp_buf, sizeof(rp_buf) - 1);
+			if (len < 0) {
+				log_ukernel("bad dirfd");
+				return -1;
+			}
+			rp_buf[len] = '\0';
+			
+			// For dirfd paths, ensure we're within fsroot
+			if (strncmp(rp_buf, fsroot.c_str(), fsroot.length())) {
+				log_ukernel("dirfd path escapes fsroot: %s", rp_buf);
+				return -EACCES;
+			}
+			
+			// Strip fsroot prefix to get guest path
+			const char* guest_path = rp_buf + fsroot.length() - 1; // keep leading /
+			
+			// Append the relative path
+			size_t pref_sz = strlen(guest_path);
+			if (pref_sz + 1 + strlen(path) >= sizeof(rp_buf)) {
+				return -ENAMETOOLONG;
+			}
+			strcpy(rp_buf + pref_sz, path);
+		}
+	}
+
+	log_ukernel("path resolution: intermediate path='%s'", rp_buf);
+
+	// Resolve the final path
 	if (!realpath(rp_buf, resolved)) {
-		log_ukernel("unresolved path %s", rp_buf);
-		return -1;
-	}
-	if (strncmp(resolved, fsroot.c_str(), fsroot.length())) {
-		Panic("escaped fsroot");
+		log_ukernel("unresolved path %s: %s", rp_buf, strerror(errno));
+		return -errno;
 	}
 
-	if (path[0] != '/') {
-		strcpy(resolved, path);
+	// Final check that we haven't escaped fsroot
+	if (strncmp(resolved, fsroot.c_str(), fsroot.length() - 1)) {
+		log_ukernel("resolved path %s escapes fsroot: %s", resolved, fsroot.c_str());
+
+		return -EACCES;
 	}
 
+	log_ukernel("path resolution: final path='%s'", resolved);
 	return 0;
 }
 
@@ -317,6 +348,11 @@ static uabi_long linux_write(uabi_uint fd, const char __user *buf, uabi_size_t c
 	return rcerrno(write(fd, buf, count));
 }
 
+static uabi_long linux_writev(uabi_uint fd, const struct iovec __user *iov, uabi_uint iovcnt)
+{
+	return rcerrno(writev(fd, iov, iovcnt));
+}
+
 static uabi_long linux_readlinkat(uabi_int dfd, const char __user *path, char __user *buf, uabi_int bufsiz)
 {
 	char pathbuf[PATH_MAX];
@@ -360,6 +396,11 @@ static uabi_long linux_exit_group(uabi_int error_code)
 	return linux_exit(error_code);
 }
 
+static uabi_long linux_tgkill(uabi_int tgid, uabi_int pid, int sig)
+{
+	return rcerrno(tgkill(tgid, pid, sig));
+}
+
 static uabi_long linux_rt_sigaction(int, const struct uabi_sigaction __user *, struct sigaction __user *,
 				    uabi_size_t)
 {
@@ -379,6 +420,11 @@ static uabi_long linux_uname(uabi_new_utsname __user *name)
 static uabi_long linux_getuid()
 {
 	return getuid();
+}
+
+static uabi_long linux_getpid()
+{
+	return getpid();
 }
 
 static uabi_long linux_geteuid()
@@ -412,6 +458,11 @@ struct uabi_sysinfo {
 	u32 mem_unit;
 	char _f[20 - 2 * sizeof(u32) - sizeof(u32)];
 };
+
+static uabi_long linux_gettid()
+{
+	return gettid();
+}
 
 static uabi_long linux_sysinfo(struct uabi_sysinfo __user *info)
 {
@@ -466,6 +517,76 @@ static uabi_long linux_munmap(uabi_ulong gaddr, uabi_size_t len)
 	return rcerrno(munmap(mmu::g2h(gaddr), len));
 }
 
+static uabi_long linux_mremap(uabi_ulong old_addr, uabi_size_t old_size, 
+                            uabi_size_t new_size, uabi_ulong flags)
+{
+    // Validate inputs
+    if (old_addr & (mmu::PAGE_SIZE - 1)) {
+        log_ukernel("mremap: misaligned old_addr %x", old_addr);
+        return uerrno(-EINVAL);
+    }
+
+    // Align sizes to page boundaries
+    size_t aligned_old_size = (old_size + mmu::PAGE_SIZE - 1) & ~(mmu::PAGE_SIZE - 1);
+    size_t aligned_new_size = (new_size + mmu::PAGE_SIZE - 1) & ~(mmu::PAGE_SIZE - 1);
+
+    log_ukernel("mremap: old=%x size=%x->%x flags=%x", 
+                old_addr, aligned_old_size, aligned_new_size, flags);
+
+    // If shrinking, just return the original address
+    if (aligned_new_size <= aligned_old_size) {
+        return old_addr;
+    }
+
+    // For expanding, allocate new memory and copy
+    void* new_mem = mmu::mmap(0, aligned_new_size, PROT_READ | PROT_WRITE, 
+                             MAP_PRIVATE | MAP_ANONYMOUS);
+    
+    if (new_mem == MAP_FAILED) {
+        return uerrno(-errno);
+    }
+
+    // Copy old contents to new location
+    memcpy(new_mem, mmu::g2h(old_addr), old_size);
+    
+    // Unmap old region
+    munmap(mmu::g2h(old_addr), aligned_old_size);
+
+    uabi_long new_addr = mmu::h2g(new_mem);
+    log_ukernel("mremap: result old=%x new=%x", old_addr, new_addr);
+    
+    return new_addr;
+}
+
+static uabi_long linux_rt_sigprocmask(int how, const sigset_t *set, sigset_t *oldset, size_t sigsetsize)
+{
+    // Validate 'how' parameter
+    switch (how) {
+    case SIG_BLOCK:   // Add signals to blocked set
+        break;
+    case SIG_UNBLOCK: // Remove signals from blocked set
+        break;
+    case SIG_SETMASK: // Set the blocked set directly
+        break;
+    default:
+        return -EINVAL;
+    }
+
+    sigset_t host_set, host_oldset;
+    if (set) {
+        memcpy(&host_set, set, sizeof(sigset_t));
+    }
+
+    int rc = sigprocmask(how, set ? &host_set : NULL, 
+                        oldset ? &host_oldset : NULL);
+
+    if (oldset && rc == 0) {
+        memcpy(oldset, &host_oldset, sizeof(sigset_t));
+    }
+
+    return rcerrno(rc);
+}
+
 static uabi_long linux_mmap2(uabi_ulong gaddr, uabi_size_t len, uabi_ulong prot, uabi_ulong flags,
 			     uabi_uint fd, uabi_ulong off)
 {
@@ -484,6 +605,7 @@ static uabi_long linux_mprotect(uabi_ulong start, uabi_size_t len, uabi_ulong pr
 	// TODO: implement in mmu
 	return rcerrno(mprotect(mmu::g2h(start), len, prot));
 }
+
 
 using uabi_pid_t = uabi_int;
 
@@ -561,6 +683,81 @@ static uabi_long linux_gettimeofday(struct timeval __user *tv, struct timezone _
     return rcerrno(rc);
 }
 
+static uabi_long linux_renameat2(int olddfd, const char __user *oldpath, int newdfd, const char __user *newpath, unsigned flags)
+{
+    return rcerrno(renameat2(olddfd, oldpath, newdfd, newpath, flags));
+}
+
+static uabi_long linux_ioctl(uabi_uint fd, uabi_uint cmd, uabi_ulong arg)
+{
+	return rcerrno(ioctl(fd, cmd, arg));
+}
+static uabi_long linux_fcntl64(uabi_uint fd, uabi_uint cmd, uabi_ulong arg)
+{
+	return rcerrno(fcntl64(fd, cmd, arg));
+}
+
+static uabi_long linux_ftruncate64(uabi_uint fd, uabi_ulong length)
+{
+	return rcerrno(ftruncate64(fd, length));
+}
+
+static uabi_long linux_getcwd(char __user *buf, uabi_size_t size)
+{
+	char *host_buf = (char *)mmu::g2h(reinterpret_cast<uintptr_t>(buf));
+	char *ret = getcwd(host_buf, size);
+	if (ret == nullptr) {
+		return uerrno(-errno);
+	}
+	return strlen(host_buf) + 1;
+}
+
+static uabi_long linux_chdir(const char __user *filename)
+{
+	char pathbuf[PATH_MAX];
+	const char *host_filename = (const char *)mmu::g2h(reinterpret_cast<uintptr_t>(filename));
+	
+	log_ukernel("chdir: input path='%s'", host_filename);
+
+	// Use PathResolution to get the actual target path
+	if (PathResolution(AT_FDCWD, host_filename, pathbuf) < 0) {
+		return uerrno(-errno);
+	}
+
+	// Verify it's a directory
+	struct stat st;
+	if (stat(pathbuf, &st) < 0) {
+		log_ukernel("chdir: stat failed: %s", strerror(errno));
+		return uerrno(-errno);
+	}
+
+	if (!S_ISDIR(st.st_mode)) {
+		log_ukernel("chdir: not a directory");
+		return uerrno(-ENOTDIR);
+	}
+
+	// Get guest path by stripping fsroot
+	std::string new_guest_cwd;
+	if (strncmp(pathbuf, ukernel::process.fsroot.c_str(), ukernel::process.fsroot.length() - 1) == 0) {
+		new_guest_cwd = std::string("/") + (pathbuf + ukernel::process.fsroot.length());
+	} else {
+		log_ukernel("chdir: resolved path escapes fsroot");
+		return uerrno(-EACCES);
+	}
+
+	// Update guest's view of cwd
+	ukernel::process.guest_cwd = new_guest_cwd;
+	log_ukernel("chdir: updated guest_cwd to '%s'", new_guest_cwd.c_str());
+
+	return 0;
+}
+
+static uabi_long linux_getdents64(uabi_uint fd, struct linux_dirent64 __user *dirp, uabi_uint count)
+{
+	struct linux_dirent64 *host_dirp = (struct linux_dirent64 *)mmu::g2h(reinterpret_cast<uintptr_t>(dirp));
+	return rcerrno(getdents64(fd, host_dirp, count));
+}
+
 } // namespace ukernel_syscall
 
 void ukernel::Syscall(CPUState *state)
@@ -572,33 +769,46 @@ void ukernel::Syscall(CPUState *state)
 #endif
 }
 
-#define IMPLEMENTED_SYSCALLS(X) /* */                                                                        \
+#define IMPLEMENTED_SYSCALLS(X)                                                                            \
+	X(linux_fcntl64)                                                                                      \
+	X(linux_ioctl)                                                                                         \
 	X(linux_openat)                                                                                      \
 	X(linux_close)                                                                                       \
 	X(linux_llseek)                                                                                      \
 	X(linux_read)                                                                                        \
 	X(linux_write)                                                                                       \
+	X(linux_writev)                                                                                      \
 	X(linux_readlinkat)                                                                                  \
 	X(linux_fstat64)                                                                                     \
 	X(linux_set_tid_address)                                                                             \
 	X(linux_exit)                                                                                        \
 	X(linux_exit_group)                                                                                  \
+	X(linux_tgkill)                                                                                      \	
 	X(linux_rt_sigaction)                                                                                \
 	X(linux_uname)                                                                                       \
+	X(linux_getpid)																						\
 	X(linux_getuid)                                                                                      \
 	X(linux_geteuid)                                                                                     \
 	X(linux_getgid)                                                                                      \
 	X(linux_getegid)                                                                                     \
+	X(linux_gettid)                                                                                      \	
 	X(linux_sysinfo)                                                                                     \
 	X(linux_brk)                                                                                         \
 	X(linux_munmap)                                                                                      \
+	X(linux_mremap)                                                                                      \
 	X(linux_mmap2)                                                                                       \
 	X(linux_mprotect)                                                                                    \
 	X(linux_prlimit64)                                                                                   \
+	X(linux_renameat2)                                                                                   \
 	X(linux_getrandom)                                                                                   \
 	X(linux_statx)                                                                                       \
 	X(linux_clock_gettime64)                                                                             \
-	X(linux_gettimeofday)
+	X(linux_gettimeofday)                                                                                \
+	X(linux_rt_sigprocmask)                                                                              \
+	X(linux_ftruncate64)                                                                                 \
+	X(linux_getcwd)                                                                                      \
+	X(linux_chdir)                                                                                       \
+	X(linux_getdents64)
 
 #define SKIPPED_SYSCALLS(X) X(linux_set_robust_list)
 
@@ -709,7 +919,30 @@ int ukernel::MainThreadExecute()
 	auto state = CPUState::Current();
 	auto ut = state->GetUThread();
 	assert(ut == process.main_thread.get());
+	// log the execute time
+	auto start_time = std::chrono::high_resolution_clock::now();
 	Execute();
+	auto end_time = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+	log_dbt("rvdbt execute time: %ld ms", duration.count());
+	if (config::trace) {
+		log_dbt("ip2ip_counts size: %lu", state->ip2ip_counts.size());
+		std::map<u32, u32> ip_counts;
+		for (auto &[ip, gip_map] : state->ip2ip_counts) {
+			for (auto &[gip, count] : gip_map) {
+				log_dbt("ip=%08x, gip=%08x, count=%lu", ip, gip, count);
+				ip_counts[gip] += count;
+			}
+		}
+		for (auto &[gip, count] : ip_counts) {
+			log_dbt("gip=%08x, count=%lu", gip, count);
+		}
+		for (auto &[ip, tb] : *state->cache_tb_exec_count) {
+			if (tb && tb->flags.exec_count > 0) {
+				log_dbt("ip=%08x, count=%lu", ip, tb->flags.exec_count);
+			}
+		}
+	}
 	assert(ut->terminating);
 	// TODO(threading): make it a single exit point
 	int rc = ut->termination_code;

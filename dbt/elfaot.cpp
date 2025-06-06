@@ -19,6 +19,7 @@ struct ElfAotOptions {
 	std::string mgdump{};
 	u64 threshold{};
 	bool llvmopt{};
+	bool cross_segment_branch{};
 };
 
 static void PrintHelp(bpo::options_description &adesc)
@@ -39,7 +40,8 @@ static bool ParseOptions(ElfAotOptions &o, int argc, char **argv)
 	    ("llvm",    bpo::value(&o.use_llvm)->default_value(true), "use llvm backend")
 	    ("mgdump", bpo::value(&o.mgdump)->default_value(""), "module graphs dump dir, specify to enable")
 	    ("threshold", bpo::value(&o.threshold)->default_value(0), "threshold of execution count to compile")
-		("llvmopt", bpo::value(&o.llvmopt)->default_value(false), "enable llvm optimization");
+		("llvmopt", bpo::value(&o.llvmopt)->default_value(true), "enable llvm optimization")
+		("cross-segment-branch", bpo::value(&o.cross_segment_branch)->default_value(false), "enable cross-segment branch");
 	// clang-format on
 
 	try {
@@ -67,15 +69,21 @@ static void SetupLogger(std::string const &logopt)
 	}
 }
 
+static void SetupConfig(ElfAotOptions &opts)
+{
+	dbt::config::threshold = opts.threshold;
+	dbt::config::llvmopt = opts.llvmopt;
+	dbt::config::cross_segment_branch = opts.cross_segment_branch;
+}
+
+
 int main(int argc, char **argv)
 {
 	ElfAotOptions opts;
 	if (!ParseOptions(opts, argc, argv)) {
 		return 1;
 	}
-	dbt::config::threshold = opts.threshold;
-	dbt::config::llvmopt = opts.llvmopt;
-
+	SetupConfig(opts);
 	SetupLogger(opts.logs);
 	if (!opts.mgdump.empty()) {
 		dbt::InitModuleGraphDump(opts.mgdump.c_str());

@@ -2,6 +2,7 @@
 #include "dbt/guest/rv32_cpu.h"
 #include "dbt/guest/rv32_decode.h"
 #include "dbt/tcache/cflow_dump.h"
+#include "dbt/execute.h"
 
 #include <sstream>
 
@@ -13,9 +14,10 @@ RV32Analyser::RV32Analyser(ModuleGraph *mg_, u32 ip, uptr vmem) : vmem_base(vmem
 
 void RV32Analyser::Analyse(ModuleGraph *mg, u32 ip, u32 boundary_ip, uptr vmem)
 {
-	log_analyse("RV32Analyser: [%08x:%08x]", ip, boundary_ip);
+	log_dbt("RV32Analyser: [%08x:%08x]", ip, boundary_ip);
 	RV32Analyser t(mg, ip, vmem);
 	t.insn_ip = ip;
+	t.ends_with_br = false;
 	// mg->RecordEntry(ip);
 
 	u32 num_insns = 0;
@@ -31,8 +33,20 @@ void RV32Analyser::Analyse(ModuleGraph *mg, u32 ip, u32 boundary_ip, uptr vmem)
 			break;
 		}
 	}
+	if (mg->GetNode(ip)) {
+		log_dbt("JIT: num_insns: %d", mg->GetNode(ip)->flags.exec_instr_count);
+		log_dbt("AOT: num_insns: %d", num_insns);
+	}
+	if (!t.ends_with_br) {
+		auto curr_node = mg->GetNode(ip);
+		auto next_node = mg->GetNode(t.insn_ip);
+		if (curr_node && next_node && curr_node->flags.exec_instr_count > num_insns) {
+			log_dbt("RV32Analyser: exec_count: %d", curr_node->flags.exec_count);
+			next_node->flags.exec_count += curr_node->flags.exec_count;
+		}
+	}
 	mg->GetNode(t.bb_ip)->ip_end = t.insn_ip;
-	log_analyse("RV32Analyser: stop at %08x", t.insn_ip);
+	log_dbt("RV32Analyser: stop at %08x", t.insn_ip);
 }
 
 void RV32Analyser::AnalyseInsn()
@@ -47,18 +61,22 @@ void RV32Analyser::AnalyseBrcc(rv32::insn::B i)
 {
 	mg->RecordGBr(bb_ip, insn_ip + 4);
 	mg->RecordGBr(bb_ip, insn_ip + i.imm());
+	ends_with_br = true;
+	log_dbt("AnalyseBrcc: %08x", insn_ip);
+	log_dbt("fall through: %08x", insn_ip + 4);
+	log_dbt("branch: %08x", insn_ip + i.imm());
 }
 
 template <typename IType>
 static ALWAYS_INLINE void LogInsn(IType i, u32 ip)
 {
-	if (likely(!log_analyse.enabled())) {
+	if (likely(!log_dbt.enabled())) {
 		return;
 	}
 	std::stringstream ss;
 	ss << i;
 	const auto &res = ss.str();
-	log_analyse("\t %08x: %-8s   %s", ip, IType::opcode_str, res.c_str());
+	log_dbt("\t %08x: %-8s   %s", ip, IType::opcode_str, res.c_str());
 }
 
 #define Analyser(name)                                                                                       \
@@ -91,6 +109,7 @@ Analyser(jal)
 	if (i.rd()) {
 		mg->RecordLink(bb_ip, insn_ip + 4);
 	}
+	ends_with_br = true;
 }
 Analyser(jalr)
 {
@@ -98,6 +117,7 @@ Analyser(jalr)
 	if (i.rd()) {
 		mg->RecordLink(bb_ip, insn_ip + 4);
 	}
+	ends_with_br = true;
 }
 Analyser(beq)
 {

@@ -558,14 +558,16 @@ inline CondCode SwapCC(CondCode cc)
 }
 
 struct InstBrcc : InstWithOperands<0, 2> {
-	InstBrcc(CondCode cc_, VOperand s1, VOperand s2, u32 f_ip, u32 t_ip)
-	    : InstWithOperands(Op::_brcc, {}, {s1, s2}), cc(cc_), f_ip(f_ip), t_ip(t_ip)
+	InstBrcc(CondCode cc_, VOperand s1, VOperand s2, u32 f_ip, u32 t_ip, bool f_gbr_, bool t_gbr_)
+	    : InstWithOperands(Op::_brcc, {}, {s1, s2}), cc(cc_), f_ip(f_ip), t_ip(t_ip), f_gbr(f_gbr_), t_gbr(t_gbr_)
 	{
 	}
 
 	CondCode cc;
 	u32 f_ip;
 	u32 t_ip;
+	bool f_gbr;
+	bool t_gbr;
 };
 
 struct InstGBr : InstNoOperands {
@@ -822,6 +824,8 @@ struct Region : InArena {
 	{
 		return &vregs_info;
 	}
+
+	u32 num_insns{0};
 
 private:
 	MemArena *arena;

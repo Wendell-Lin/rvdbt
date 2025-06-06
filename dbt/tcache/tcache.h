@@ -30,7 +30,7 @@ struct alignas(8) TBlock {
 		bool is_brind_target : 1 {false};
 		bool is_segment_entry : 1 {false};
 		u64 exec_count : 64 {0};
-		u64 exec_instr_count : 64 {0}; // todo: impl this if exec_count is not enough
+		u32 exec_instr_count: 32 {0};
 	} flags;
 };
 
@@ -63,11 +63,19 @@ struct tcache {
 
 	static void CacheBr(TBlock *tb)
 	{
+		auto &entry = cache_tb_exec_count[l1hash(tb->ip)];
+		if (entry.tb && entry.tb->ip != tb->ip) {
+			log_tcache("Cache collision, both %08x and %08x with hash %08x", entry.tb->ip, tb->ip, l1hash(tb->ip));
+		}
 		cache_tb_exec_count[l1hash(tb->ip)] = {tb->ip, tb};
 	}
 
 	static void CacheBrind(TBlock *tb)
 	{
+		auto &entry = cache_tb_exec_count[l1hash(tb->ip)];
+		if (entry.tb && entry.tb->ip != tb->ip) {
+			log_tcache("Cache collision, both %08x and %08x with hash %08x", entry.tb->ip, tb->ip, l1hash(tb->ip));
+		}
 		// l1_brind_cache[l1hash(tb->ip)] = {tb->ip, tb->tcode.ptr, tb};
 		l1_brind_cache[l1hash(tb->ip)] = {tb->ip, tb->tcode.ptr};
 		cache_tb_exec_count[l1hash(tb->ip)] = {tb->ip, tb};

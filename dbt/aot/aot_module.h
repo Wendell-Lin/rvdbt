@@ -11,6 +11,8 @@
 namespace dbt
 {
 
+LOG_STREAM(analyse)
+
 // TODO: optimize layout and use Arena containers
 struct ModuleGraphNode {
 	explicit ModuleGraphNode(u32 ip_) : ip(ip_) {}
@@ -28,22 +30,29 @@ struct ModuleGraphNode {
 		succ->preds.push_back(this);
 	}
 
+	void AddCrossSucc(u32 ip)
+	{
+		cross_succs.push_back(ip);
+	}
+
 	u32 ip{};
 	u32 ip_end{0};
+	
 	struct {
 		bool is_brind_target : 1 {false};
 		bool is_segment_entry : 1 {false};
 		bool region_entry : 1 {false};
 		bool is_brind_source : 1 {false};
 		bool is_crosssegment_br : 1 {false};
-		u64 exec_instr_count{0};
 		u64 exec_count{0};
+		u32 exec_instr_count{0};
 	} flags;
 
 	ModuleGraphNode *link{};
 
 	std::vector<ModuleGraphNode *> succs;
 	std::vector<ModuleGraphNode *> preds;
+	std::vector<u32> cross_succs;
 
 	ModuleGraphNode *dominator{};
 	std::set<ModuleGraphNode *> domfrontier;
@@ -108,7 +117,7 @@ struct ModuleGraph {
 		root->AddSucc(node);
 	}
 
-	void RecordExec(u32 ip, u64 exec_instr_count, u64 exec_count)
+	void RecordExec(u32 ip, u32 exec_instr_count, u64 exec_count)
 	{
 		auto *node = GetNode(ip);
 		node->flags.exec_instr_count = exec_instr_count;
@@ -121,6 +130,7 @@ struct ModuleGraph {
 		if (auto tgt = GetNode(tgtip); tgt) {
 			src->AddSucc(tgt);
 		} else {
+			src->AddCrossSucc(tgtip);
 			src->flags.is_crosssegment_br = true;
 		}
 	}

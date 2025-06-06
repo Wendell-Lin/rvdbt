@@ -15,7 +15,8 @@ struct CompilerRuntime {
 
 	virtual bool AllowsRelocation() const = 0;
 
-	virtual void *AnnounceRegion(u32 ip, std::span<u8> const &code) = 0;
+	virtual void *AnnounceRegion(u32 ip, std::span<u8> const &code, u32 num_insns) = 0;
+	// virtual void *AnnounceRegion(u32 ip, std::span<u8> const &code) = 0;
 };
 
 static constexpr std::string_view AOT_SYM_PREFIX = "_x";

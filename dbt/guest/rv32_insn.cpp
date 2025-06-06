@@ -81,4 +81,10 @@ void CPUStateImpl::DumpTrace(char const *event)
 	// log_trace.write(buf.data());
 }
 
+void CPUStateImpl::DumpTraceCache(u32 gip, u32 entry_ip)
+{
+	ip2ip_counts[entry_ip][gip]++;
+	// log_trace("ip2ip_counts[%08x][%08x]=%u", entry_ip, gip, ip2ip_counts[entry_ip][gip]);
+}
+
 } // namespace dbt::rv32

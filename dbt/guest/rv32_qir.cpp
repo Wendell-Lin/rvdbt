@@ -62,7 +62,7 @@ StateInfo const *const RV32Translator::state_info = GetStateInfo();
 
 RV32Translator::RV32Translator(qir::Region *region_, uptr vmem) : qb(), vmem_base(vmem) {}
 
-void RV32Translator::Translate(qir::Region *region, CompilerJob::IpRangesSet *ipranges, uptr vmem)
+u32 RV32Translator::Translate(qir::Region *region, CompilerJob::IpRangesSet *ipranges, uptr vmem)
 {
 	log_qir("RV32Translator: start");
 	RV32Translator t(region, vmem);
@@ -71,14 +71,16 @@ void RV32Translator::Translate(qir::Region *region, CompilerJob::IpRangesSet *ip
 		t.ip2bb.insert({range.first, region->CreateBlock()});
 	}
 
+	u32 num_insns = 0;
 	for (auto const &range : *ipranges) {
-		t.TranslateIPRange(range.first, range.second);
+		num_insns += t.TranslateIPRange(range.first, range.second);
 	}
 
 	log_qir("RV32Translator: finish");
+	return num_insns;
 }
 
-void RV32Translator::TranslateIPRange(u32 ip, u32 boundary_ip)
+u32 RV32Translator::TranslateIPRange(u32 ip, u32 boundary_ip)
 {
 	log_qir("RV32Translator: [%08x:%08x]", ip, boundary_ip);
 	bb_ip = insn_ip = ip;
@@ -108,6 +110,7 @@ void RV32Translator::TranslateIPRange(u32 ip, u32 boundary_ip)
 		}
 	}
 	log_qir("RV32Translator: stop at %08x", ip);
+	return num_insns;
 }
 
 // TODO: move to late qir pass?
@@ -140,7 +143,9 @@ void RV32Translator::MakeGBr(u32 ip)
 void RV32Translator::TranslateBrcc(rv32::insn::B i, CondCode cc)
 {
 #if 1
-	auto make_target = [&](u32 ip) {
+	bool bb_t_gbr = false;
+	bool bb_f_gbr = false;
+	auto make_target = [&](u32 ip, bool &gbr) {
 		cflow_dump::RecordGBr(bb_ip, ip);
 		auto it = ip2bb.find(ip);
 		if (it != ip2bb.end()) {
@@ -148,6 +153,7 @@ void RV32Translator::TranslateBrcc(rv32::insn::B i, CondCode cc)
 		} else {
 			qb = Builder(qb.CreateBlock());
 			qb.Create_gbr(vconst(ip));
+			gbr = true;
 			return qb.GetBlock();
 		}
 	};
@@ -155,11 +161,12 @@ void RV32Translator::TranslateBrcc(rv32::insn::B i, CondCode cc)
 	auto bb_src = qb.GetBlock();
 	auto bb_f_ip = insn_ip + 4;
 	auto bb_t_ip = insn_ip + i.imm();
-	auto bb_f = make_target(bb_f_ip);
-	auto bb_t = make_target(bb_t_ip);
+	auto bb_f = make_target(bb_f_ip, bb_f_gbr);
+	auto bb_t = make_target(bb_t_ip, bb_t_gbr);
+	log_qir("%08x: %08x: %b %b", bb_f_ip, bb_t_ip, bb_f_gbr, bb_t_gbr);
 	qb = Builder(bb_src);
 
-	qb.Create_brcc(cc, gprop(i.rs1()), gprop(i.rs2()), bb_f_ip, bb_t_ip);
+	qb.Create_brcc(cc, gprop(i.rs1()), gprop(i.rs2()), bb_f_ip, bb_t_ip, bb_f_gbr, bb_t_gbr);
 	qb.GetBlock()->AddSucc(bb_t);
 	qb.GetBlock()->AddSucc(bb_f);
 #else // TODO: qir cleanup pass: remove empty bb
@@ -325,6 +332,7 @@ TRANSLATOR(jal)
 	}
 
 	MakeGBr(insn_ip + i.imm());
+	control = Control::BRANCH;
 }
 TRANSLATOR(jalr)
 {

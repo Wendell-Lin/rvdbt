@@ -1,16 +1,19 @@
 #pragma once
 
 #include "dbt/util/common.h"
+#include "dbt/util/logger.h"
 
 namespace dbt::qir
 {
+LOG_STREAM(aot)
+
 using Mark = uint16_t;
 
 struct MarkerKeeper;
 
 template <typename N, typename S>
 struct Marker {
-	Marker(MarkerKeeper *mkeeper, u8 states);
+	Marker(MarkerKeeper *mkeeper, u16 states);
 
 	S Get(N *n)
 	{
@@ -45,7 +48,7 @@ private:
 };
 
 template <typename N, typename S>
-inline Marker<N, S>::Marker(MarkerKeeper *keeper, u8 states)
+inline Marker<N, S>::Marker(MarkerKeeper *keeper, u16 states)
 {
 	mmin = keeper->mmin = keeper->mmax;
 	mmax = keeper->mmax = keeper->mmin + states;

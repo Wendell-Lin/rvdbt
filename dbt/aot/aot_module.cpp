@@ -11,6 +11,14 @@ LOG_STREAM(aot)
 
 static FILE *g_modulegraph_dump = nullptr;
 
+// Add this global structure to store cross-segment branch information
+struct CrossSegmentBranch {
+	u32 src_ip;
+	u32 target_ip;
+};
+static std::vector<CrossSegmentBranch> g_cross_segment_branches;
+static std::set<u32> g_ip_set;
+
 void InitModuleGraphDump(char const *dir)
 {
 	auto fpath = std::string(dir) + "/modulegraph.gv";
@@ -21,6 +29,17 @@ void InitModuleGraphDump(char const *dir)
 	g_modulegraph_dump = f;
 	fprintf(f, "digraph rvdbt_modulegraph{\nnode[style=\"rounded,filled\",shape=rect]\n");
 	atexit([]() {
+		// Add all cross-segment branch edges
+		// if (dbt::config::cross_segment_branch) {
+		// 	for (const auto& branch : g_cross_segment_branches) {
+		// 		if (g_ip_set.find(branch.target_ip) != g_ip_set.end()) {
+		// 			fprintf(g_modulegraph_dump, 
+		// 				"B%08x->B%08x[color=magenta,penwidth=2,style=dashed]\n", 
+		// 				branch.src_ip, branch.target_ip);
+		// 		}
+		// 	}
+		// }
+		
 		fprintf(g_modulegraph_dump, "}\n");
 		fclose(g_modulegraph_dump);
 	});
@@ -33,8 +52,8 @@ static void DumpModuleGraph(ModuleGraph *mg, std::vector<std::vector<ModuleGraph
 
 void ModuleGraph::Dump(FILE *f, std::vector<std::vector<ModuleGraphNode *>> const *regions)
 {
-	auto const add_node = [f](u32 ip, u64 exec_count, char const *color) {
-		fprintf(f, "B%08x[fillcolor=%s,label=\"%08x\\n%lu\"]\n", ip, color, ip, exec_count);
+	auto const add_node = [f](u32 ip, u64 exec_count, u32 exec_instr_count, char const *color) {
+		fprintf(f, "B%08x[fillcolor=%s,label=\"%08x\\n%lu\\n%u\"]\n", ip, color, ip, exec_count, exec_instr_count);
 	};
 
 	auto const add_edge = [f](u32 src, u32 tgt, char const *opts) {
@@ -43,9 +62,10 @@ void ModuleGraph::Dump(FILE *f, std::vector<std::vector<ModuleGraphNode *>> cons
 
 	auto dump_node = [&](ModuleGraphNode const &n) {
 		auto flags = n.flags;
+		g_ip_set.insert(n.ip);
 
-		add_node(n.ip, n.flags.exec_count, 
-			(dbt::config::threshold && flags.exec_count > dbt::config::threshold) ? "red" 
+		add_node(n.ip, n.flags.exec_count, n.flags.exec_instr_count,
+			(dbt::config::threshold && flags.exec_count >= dbt::config::threshold) ? "red" 
 					: flags.is_segment_entry  ? "green"
 			       : flags.is_brind_target ? "orange"
 			       : flags.region_entry    ? "purple"
@@ -64,6 +84,17 @@ void ModuleGraph::Dump(FILE *f, std::vector<std::vector<ModuleGraphNode *>> cons
 		add_edge(n.ip, t.ip, "color=darkgreen,style=dashed");
 	};
 
+	auto dump_crosssegment_branch = [&](ModuleGraphNode const &n, u32 target_ip) {
+		// Create a virtual node for the external target with special styling
+		fprintf(f, "B%08x_ext[fillcolor=yellow,style=dashed,label=\"%08x\\nExternal\"]\n", 
+				target_ip, target_ip);
+		
+		// Add an edge from the source to the virtual target
+		fprintf(f, "B%08x->B%08x_ext[color=magenta,penwidth=2,style=dashed]\n", 
+				n.ip, target_ip);
+	};
+
+	// Dump all nodes and regular edges
 	for (auto const &it : ip_map) {
 		auto const &n = *it.second;
 		dump_node(n);
@@ -72,6 +103,13 @@ void ModuleGraph::Dump(FILE *f, std::vector<std::vector<ModuleGraphNode *>> cons
 		}
 		if (n.link) {
 			dump_link(n, *n.link);
+		}
+		// Visualize cross-segment branches
+		if (dbt::config::cross_segment_branch) {
+			for (auto const &target_ip : n.cross_succs) {
+				dump_crosssegment_branch(n, target_ip);
+				// g_cross_segment_branches.push_back({n.ip, target_ip});
+			}
 		}
 	}
 
@@ -156,6 +194,7 @@ void ModuleGraph::ComputeDomTree()
 	auto const rpot = RPOTraversal(*this);
 
 	auto n_nodes = ip_map.size() + 1;
+	assert(n_nodes <= std::numeric_limits<u16>::max()); // TODO: use u32 or even u64 if the region is too large.
 	qir::Marker<ModuleGraphNode, u16> rpon(&markers, n_nodes);
 	{
 		u16 rpo_no = 0;
@@ -163,6 +202,7 @@ void ModuleGraph::ComputeDomTree()
 			rpon.Set(n, rpo_no++);
 		}
 		if (rpo_no != n_nodes) {
+			log_analyse("%lu v.s. %u", rpo_no, n_nodes);
 			Panic("unreachable regions in modulegraph");
 		}
 	}

@@ -32,7 +32,8 @@ struct AOTCompilerRuntime final : CompilerRuntime {
 		return true;
 	}
 
-	void *AnnounceRegion(u32 ip, std::span<u8> const &code) override
+	void *AnnounceRegion(u32 ip, std::span<u8> const &code, u32 num_insns) override
+	// void *AnnounceRegion(u32 ip, std::span<u8> const &code) override
 	{
 		auto str_idx = elf_stra.add_string(MakeAotSymbol(ip));
 		uptr code_offs = (uptr)code.data() - (uptr)code_arena.BaseAddr();

@@ -38,7 +38,8 @@ struct LLVMAOTCompilerRuntime final : CompilerRuntime {
 		unreachable("");
 	}
 
-	void *AnnounceRegion(u32 ip, std::span<u8> const &code) override
+	// void *AnnounceRegion(u32 ip, std::span<u8> const &code) override
+	void *AnnounceRegion(u32 ip, std::span<u8> const &code, u32 num_insns) override
 	{
 		unreachable("");
 	}

@@ -25,7 +25,8 @@ struct JITCompilerRuntime final : CompilerRuntime {
 		return false;
 	}
 
-	void *AnnounceRegion(u32 ip, std::span<u8> const &code) override
+	void *AnnounceRegion(u32 ip, std::span<u8> const &code, u32 num_insns) override
+	// void *AnnounceRegion(u32 ip, std::span<u8> const &code) override
 	{
 		// TODO: concurrent tcache
 		auto tb = tcache::AllocateTBlock();
@@ -34,6 +35,7 @@ struct JITCompilerRuntime final : CompilerRuntime {
 		}
 		tb->ip = ip;
 		tb->tcode = TBlock::TCode{code.data(), code.size()};
+		tb->flags.exec_instr_count = num_insns;
 		tcache::Insert(tb);
 		return (void *)tb;
 	}
@@ -45,9 +47,10 @@ static inline IpRange GetCompilationIPRange(u32 ip)
 	if (config::dump_trace) {
 		return {ip, upper};
 	}
-	if (auto *tb_upper = tcache::LookupUpperBound(ip)) {
-		upper = std::min(upper, tb_upper->ip);
-	}
+	// TODO: this avoid translate until an existing TB, whose IP range may overlap with the new one that is hard to profile
+	// if (auto *tb_upper = tcache::LookupUpperBound(ip)) {
+	// 	upper = std::min(upper, tb_upper->ip);
+	// }
 	return {ip, upper};
 }
 
@@ -84,10 +87,8 @@ void Execute(CPUState *state)
 			tcache::CacheBrind(tb);
 		}
 
-		if (tb->flags.exec_instr_count == 0) {
-			tb->flags.exec_instr_count = (u64) tb->tcode.size;
-		}
 		tb->flags.exec_count += 1;
+		log_dbt("ip %08x back to loop with count %d, insn count %d", state->ip, tb->flags.exec_count, tb->flags.exec_instr_count);
 		branch_slot = jitabi::trampoline_to_jit(state, mmu::base, tb->tcode.ptr);
 	}
 }

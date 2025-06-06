@@ -4,7 +4,8 @@ python3 examples/benchmarks.py \
     --prebuilts $(pwd)/prebuilts \
     --riscv32-gcc riscv32-unknown-elf-gcc \
     --rvdbt-jit \
-    --rvdbt-llvmaot-1000 \
     --rvdbt-llvmaot \
-    --benchmark rv32emu \
-    --objective test
+    --rvdbt-llvmaot-hotspot \
+    --benchmark mibench
+    # --rvdbt-qcgaot \
+    # --libriscv

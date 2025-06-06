@@ -16,6 +16,7 @@ namespace dbt
 	X(brind)                                                                                             \
 	X(raise)                                                                                             \
 	X(trace)                                                                                             \
+	X(trace_cache)                                                                                       \
 	X(nevercalled)
 
 #define RUNTIME_STUBS(X) COMMON_RUNTIME_STUBS(X) GUEST_RUNTIME_STUBS(X)

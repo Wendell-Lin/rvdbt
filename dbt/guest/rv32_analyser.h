@@ -5,6 +5,7 @@
 
 namespace dbt::rv32
 {
+
 using namespace dbt::rv32;
 
 struct RV32Analyser {
@@ -29,6 +30,7 @@ private:
 	u32 bb_ip{}; // for cflow_dump
 
 	ModuleGraph *mg{};
+	bool ends_with_br{false};
 };
 
 } // namespace dbt::rv32

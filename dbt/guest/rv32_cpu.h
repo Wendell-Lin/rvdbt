@@ -26,6 +26,8 @@ struct CPUStateImpl {
 	}
 
 	void DumpTrace(char const *event);
+	void DumpTraceCache(u32 gip, u32 entry_ip);
+	std::unordered_map<u32, std::unordered_map<u32, u64>> ip2ip_counts; // map from ip to gip to count
 
 	using gpr_t = u32;
 	static constexpr u8 gpr_num = 32;
