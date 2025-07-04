@@ -3,6 +3,7 @@
 #include "dbt/qmc/llvmgen/llvmgen.h"
 #include "dbt/qmc/qcg/jitabi.h"
 #include "dbt/tcache/objprof.h"
+#include "dbt/execute.h"
 
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
@@ -48,11 +49,19 @@ struct LLVMAOTCompilerRuntime final : CompilerRuntime {
 u64 getMaxExecCountInRegion(std::vector<dbt::ModuleGraphNode *> const &region)
 {
 	u64 mx_cnt = 0;
+	ModuleGraphNode *mx_n = nullptr;
 	for (auto const &n : region) {
 		if (n->flags.exec_count > mx_cnt) {
 			mx_cnt = n->flags.exec_count;
+			mx_n = n;
 		}
 	}
+
+	if (mx_n && mx_n->flags.is_critical) {
+		// log_dbt("critical region: %08x", region[0]->ip);
+		log_dbt("critical region: %08x", mx_n->ip);
+	}
+
 	return mx_cnt;
 }
 
@@ -70,6 +79,7 @@ static void DeclareKnownRegionEntries(qir::LLVMGenCtx *ctx, objprof::PageData co
 		if (page.brind_target[idx] || page.segment_entry[idx]) 
 		{
 			u32 ip = page_vaddr + objprof::PageData::idx2po(idx);
+			// Check if this IP is in the avoid list
 			ctx->AddFunction(ip, segment);
 		}
 	}
@@ -84,6 +94,7 @@ static void LLVMAOTTranslatePage(qir::LLVMGenCtx *ctx, std::vector<AOTSymbol> *a
 	for (auto const &r : regions) {
 		if (getMaxExecCountInRegion(r) < dbt::config::threshold)
 			continue;
+		// log_dbt("Adding function: %x", r[0]->ip);
 		ctx->AddFunction(r[0]->ip, mg.segment);
 	}
 
@@ -91,9 +102,9 @@ static void LLVMAOTTranslatePage(qir::LLVMGenCtx *ctx, std::vector<AOTSymbol> *a
 		assert(r[0]->flags.region_entry);
 		if (getMaxExecCountInRegion(r) < dbt::config::threshold)
 			continue;
-		log_aot("Compiling region with 1st ip: %x", r[0]->ip);
 		qir::CompilerJob::IpRangesSet ipranges;
 		for (auto n : r) {
+			// log_dbt("Adding ip range: %x-%x", n->ip, n->ip_end);
 			ipranges.push_back({n->ip, n->ip_end});
 		}
 
@@ -259,6 +270,7 @@ void LLVMAOTCompileELF()
 		}
 		mpm.run(cmodule, mam);
 	}
+	assert(dbt::config::avoid_ips.empty());
 
 	// cmodule.print(llvm::errs(), nullptr);
 	AddAOTTabSection(cmodule, aot_symbols);

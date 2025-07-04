@@ -48,7 +48,7 @@ struct CPUStateImpl {
 };
 
 // qmc config, also used to synchronize int/jit debug tracing
-static constexpr u16 TB_MAX_INSNS = 64;
+static constexpr u16 TB_MAX_INSNS = 64; // TODO: this cannot be changed too large, but where does the 
 
 } // namespace dbt::rv32
 

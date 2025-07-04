@@ -53,6 +53,7 @@ static void DumpModuleGraph(ModuleGraph *mg, std::vector<std::vector<ModuleGraph
 void ModuleGraph::Dump(FILE *f, std::vector<std::vector<ModuleGraphNode *>> const *regions)
 {
 	auto const add_node = [f](u32 ip, u64 exec_count, u32 exec_instr_count, char const *color) {
+		auto end = ip + exec_instr_count * 4; // TODO: print this instead of exec_instr_count for easier checking
 		fprintf(f, "B%08x[fillcolor=%s,label=\"%08x\\n%lu\\n%u\"]\n", ip, color, ip, exec_count, exec_instr_count);
 	};
 

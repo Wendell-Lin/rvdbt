@@ -195,7 +195,7 @@ void QEmit::Emit_hcall(qir::InstHcall *ins)
 
 void QEmit::Emit_Cache(u32 target_ip)
 {
-	if (dbt::config::use_aot) {
+	if (dbt::config::use_aot || dbt::config::not_freq) {
 		return;
 	}
 	auto skip_cache = j.newLabel();
@@ -311,12 +311,12 @@ void QEmit::Emit_gbrind(qir::InstGBrind *ins)
 	assert(ptgt.id() == asmjit::x86::Gp::kIdSi);
 
 	auto slowpath = j.newLabel();
-	
+	if (likely(!dbt::config::trace)) 
 	{
 		// commented the original 
 		// Inlined l1_brind_cache lookup
 		auto tmp0 = asmjit::x86::rdi;
-		auto tmp1 = asmjit::x86::rdx;
+		auto tmp1 = asmjit::x86::r14; // Note not using the regs in X(*) like X(rdx)
 		auto tmp2 = asmjit::x86::r12;
 
 		if (jit_mode) {
@@ -341,7 +341,7 @@ void QEmit::Emit_gbrind(qir::InstGBrind *ins)
 			j.mov(tmp2.r64(), asmjit::x86::Mem(R_STATE, offsetof(CPUState, cache_tb_exec_count)));
 		}
 		// j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp0.r64(), 0, offsetof(tcache::BrindCaxwcheEntry, code)));
-		if (!dbt::config::use_aot) {
+		if (!dbt::config::use_aot && !dbt::config::not_freq) {
 			j.mov(tmp2.r64(), asmjit::x86::ptr(tmp2.r64(), tmp0.r64(), 0, offsetof(tcache::CacheTbExecCountEntry, tb), sizeof(u64)));
 			// todo: this 8 is computed from the size of the flags to exec count, should be changed to another offsetof.
 			j.inc(asmjit::x86::qword_ptr(tmp2.r64(), offsetof(TBlock, flags) + 8));

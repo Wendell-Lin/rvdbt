@@ -8,6 +8,7 @@
 #include <boost/program_options.hpp>
 #include <boost/tokenizer.hpp>
 #include <iostream>
+#include <sstream>
 
 namespace bpo = boost::program_options;
 
@@ -20,6 +21,7 @@ struct ElfAotOptions {
 	u64 threshold{};
 	bool llvmopt{};
 	bool cross_segment_branch{};
+	bool propagate_exec_count{};
 };
 
 static void PrintHelp(bpo::options_description &adesc)
@@ -40,8 +42,9 @@ static bool ParseOptions(ElfAotOptions &o, int argc, char **argv)
 	    ("llvm",    bpo::value(&o.use_llvm)->default_value(true), "use llvm backend")
 	    ("mgdump", bpo::value(&o.mgdump)->default_value(""), "module graphs dump dir, specify to enable")
 	    ("threshold", bpo::value(&o.threshold)->default_value(0), "threshold of execution count to compile")
-		("llvmopt", bpo::value(&o.llvmopt)->default_value(true), "enable llvm optimization")
-		("cross-segment-branch", bpo::value(&o.cross_segment_branch)->default_value(false), "enable cross-segment branch");
+		("llvmopt", bpo::value(&o.llvmopt)->default_value(false), "enable llvm optimization")
+		("cross-segment-branch", bpo::value(&o.cross_segment_branch)->default_value(false), "enable cross-segment branch")
+		("propagate-exec-count", bpo::value(&o.propagate_exec_count)->default_value(true), "propagate execution count");
 	// clang-format on
 
 	try {
@@ -74,8 +77,8 @@ static void SetupConfig(ElfAotOptions &opts)
 	dbt::config::threshold = opts.threshold;
 	dbt::config::llvmopt = opts.llvmopt;
 	dbt::config::cross_segment_branch = opts.cross_segment_branch;
+	dbt::config::propagate_exec_count = opts.propagate_exec_count;
 }
-
 
 int main(int argc, char **argv)
 {

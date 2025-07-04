@@ -70,21 +70,22 @@ void CPUStateImpl::DumpTrace(char const *event)
 	std::array<char, 1024> buf;
 	auto cur = buf.begin();
 
-	// cur += snprintf(cur, 80, "#### %08x #### %s\n", ip, event);
-	log_trace("#### %08x #### %s", ip, event);
+	cur += snprintf(cur, 80, "#### %08x #### %s\n", ip, event);
+	// log_trace("#### %08x #### %s", ip, event);
 
-	// for (int i = 0; i < 32; ++i) {
-	// for (int i = 0; i < 32; ++i) {
-	// 	cur += sprintf(cur, "%4.4s=%08x", insn::GRPToName(i), gpr[i]);
-	// }
+	for (int i = 0; i < 32; ++i) {
+		cur += sprintf(cur, "%4.4s=%08x", insn::GRPToName(i), gpr[i]);
+	}
 
-	// log_trace.write(buf.data());
+	log_trace.write(buf.data());
 }
 
 void CPUStateImpl::DumpTraceCache(u32 gip, u32 entry_ip)
 {
 	ip2ip_counts[entry_ip][gip]++;
-	// log_trace("ip2ip_counts[%08x][%08x]=%u", entry_ip, gip, ip2ip_counts[entry_ip][gip]);
+	if (ip2ip_counts[entry_ip][gip] == 1) {
+		log_trace("ip2ip_counts[%08x][%08x]=%u", entry_ip, gip, ip2ip_counts[entry_ip][gip]);
+	}
 }
 
 } // namespace dbt::rv32

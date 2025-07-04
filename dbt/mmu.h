@@ -17,7 +17,8 @@ struct mmu {
 	static constexpr size_t PAGE_BITS = 12; // true for rv32 and amd64
 	static constexpr size_t PAGE_SIZE = 1 << PAGE_BITS;
 	static constexpr size_t PAGE_MASK = ~(PAGE_SIZE - 1);
-	static constexpr size_t MIN_MMAP_ADDR = 16 * PAGE_SIZE;
+	static constexpr size_t MIN_MMAP_ADDR = 64 * PAGE_SIZE;
+	// TODO: this should be large enough, like 32, to avoid weird behavior of syscall in 502.gcc, but the reason remains to find out.
 	static void Init();
 	static void Destroy();
 	static void *mmap(u32 vaddr, u32 len, int prot, int flag = MAP_ANON | MAP_PRIVATE | MAP_FIXED,

@@ -94,7 +94,7 @@ struct tcache {
 	static void *AllocateCode(size_t sz, u16 align);
 	static TBlock *AllocateTBlock();
 
-	static constexpr u32 L1_CACHE_BITS = 12;
+	static constexpr u32 L1_CACHE_BITS = 22; // TODO: this should depend on the size of the executable, to avoid cache miss that possibly leads to inacurate profiler.
 	using L1Cache = std::array<TBlock *, 1u << L1_CACHE_BITS>;
 	static L1Cache l1_cache;
 
@@ -114,6 +114,16 @@ struct tcache {
 	static ALWAYS_INLINE u32 l1hash(u32 ip)
 	{
 		return (ip >> 2) & ((1ull << L1_CACHE_BITS) - 1);
+	}
+
+	static void PrintTBPoolStats()
+	{
+		log_tcache("TB pool used size: %zu", tb_pool.GetUsedSize());
+	}
+
+	static void PrintCodePoolStats()
+	{
+		log_tcache("Code pool used size: %zu", code_pool.GetUsedSize());
 	}
 
 private:

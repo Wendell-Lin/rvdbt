@@ -12,9 +12,9 @@ LOG_STREAM(analyse)
 
 RV32Analyser::RV32Analyser(ModuleGraph *mg_, u32 ip, uptr vmem) : vmem_base(vmem), bb_ip(ip), mg(mg_) {}
 
-void RV32Analyser::Analyse(ModuleGraph *mg, u32 ip, u32 boundary_ip, uptr vmem)
+void RV32Analyser::Analyse(ModuleGraph *mg, u32 ip, u32 boundary_ip, uptr vmem, u64 &exec_count, std::map<u32, u64> &exec_count_map)
 {
-	log_dbt("RV32Analyser: [%08x:%08x]", ip, boundary_ip);
+	log_analyse("RV32Analyser: [%08x:%08x]", ip, boundary_ip);
 	RV32Analyser t(mg, ip, vmem);
 	t.insn_ip = ip;
 	t.ends_with_br = false;
@@ -33,20 +33,32 @@ void RV32Analyser::Analyse(ModuleGraph *mg, u32 ip, u32 boundary_ip, uptr vmem)
 			break;
 		}
 	}
-	if (mg->GetNode(ip)) {
-		log_dbt("JIT: num_insns: %d", mg->GetNode(ip)->flags.exec_instr_count);
-		log_dbt("AOT: num_insns: %d", num_insns);
-	}
-	if (!t.ends_with_br) {
+	if (dbt::config::propagate_exec_count) {
+		for (auto it = exec_count_map.begin(); it != exec_count_map.end();) {
+			if (it->first <= ip) {
+				exec_count -= it->second;
+				it = exec_count_map.erase(it);
+			} else {
+				break;
+			}
+		}
 		auto curr_node = mg->GetNode(ip);
-		auto next_node = mg->GetNode(t.insn_ip);
-		if (curr_node && next_node && curr_node->flags.exec_instr_count > num_insns) {
-			log_dbt("RV32Analyser: exec_count: %d", curr_node->flags.exec_count);
-			next_node->flags.exec_count += curr_node->flags.exec_count;
+		if (curr_node && exec_count > 0) {
+			log_dbt("propagate exec_count: %d to %08x", exec_count, ip);
+			log_dbt("%llu becomes %llu", curr_node->flags.exec_count, curr_node->flags.exec_count + exec_count);
+			if (curr_node->flags.exec_count < dbt::config::threshold && curr_node->flags.exec_count + exec_count >= dbt::config::threshold) {
+				log_dbt("propagate exec_count: %08x has critical exec_count: %llu", curr_node->ip, curr_node->flags.exec_count);
+				curr_node->flags.is_critical = true;
+			}
+			curr_node->flags.exec_count += exec_count;
+		}
+		if (curr_node->flags.exec_instr_count > num_insns) {
+			exec_count += curr_node->flags.exec_count;
+			exec_count_map[ip + curr_node->flags.exec_instr_count * 4] += curr_node->flags.exec_count;
 		}
 	}
 	mg->GetNode(t.bb_ip)->ip_end = t.insn_ip;
-	log_dbt("RV32Analyser: stop at %08x", t.insn_ip);
+	// log_dbt("RV32Analyser: stop at %08x", t.insn_ip);
 }
 
 void RV32Analyser::AnalyseInsn()
@@ -62,9 +74,6 @@ void RV32Analyser::AnalyseBrcc(rv32::insn::B i)
 	mg->RecordGBr(bb_ip, insn_ip + 4);
 	mg->RecordGBr(bb_ip, insn_ip + i.imm());
 	ends_with_br = true;
-	log_dbt("AnalyseBrcc: %08x", insn_ip);
-	log_dbt("fall through: %08x", insn_ip + 4);
-	log_dbt("branch: %08x", insn_ip + i.imm());
 }
 
 template <typename IType>
@@ -76,7 +85,7 @@ static ALWAYS_INLINE void LogInsn(IType i, u32 ip)
 	std::stringstream ss;
 	ss << i;
 	const auto &res = ss.str();
-	log_dbt("\t %08x: %-8s   %s", ip, IType::opcode_str, res.c_str());
+	log_analyse("\t %08x: %-8s   %s", ip, IType::opcode_str, res.c_str());
 }
 
 #define Analyser(name)                                                                                       \

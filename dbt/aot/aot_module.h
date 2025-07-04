@@ -46,6 +46,7 @@ struct ModuleGraphNode {
 		bool is_crosssegment_br : 1 {false};
 		u64 exec_count{0};
 		u32 exec_instr_count{0};
+		bool is_critical : 1 {false};
 	} flags;
 
 	ModuleGraphNode *link{};

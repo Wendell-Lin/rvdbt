@@ -6,6 +6,8 @@
 #define DBT_ZERO_MMU_BASE
 #endif
 
+#include <vector>
+
 namespace dbt::config
 {
 #ifndef NDEBUG
@@ -33,8 +35,11 @@ inline bool merge_ls = false;
 inline bool trace = true; // trace execution count more detailed
 inline bool use_aot = false;
 inline bool dump_time = false;
+inline bool not_freq = false;
 // for aot
 inline bool llvmopt = false;
 inline uint64_t threshold = 1000;
 inline bool cross_segment_branch = false;
+inline std::vector<uint64_t> avoid_ips;
+inline bool propagate_exec_count = true;
 } // namespace dbt::config

@@ -17,7 +17,7 @@ struct RV32Analyser {
 	RV32_OPCODE_LIST()
 #undef OP
 
-	static void Analyse(ModuleGraph *mg, u32 ip, u32 boundary_ip, uptr vmem);
+	static void Analyse(ModuleGraph *mg, u32 ip, u32 boundary_ip, uptr vmem, u64 &exec_count, std::map<u32, u64> &exec_count_map);
 
 private:
 	explicit RV32Analyser(ModuleGraph *mg_, u32 ip, uptr vmem);

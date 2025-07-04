@@ -109,7 +109,7 @@ class RVDBTExec(BaseExec):
     build_dir = None
     cache_dir = None
 
-    def __init__(self, aot, llvm=False, hotspot_threshold=0, jit_merge_ls=False, llvmopt=False, not_freq=False, noprop=False):
+    def __init__(self, aot, llvm=False, hotspot_threshold=0, jit_merge_ls=False, llvmopt=False, not_freq=False):
         super().__init__()
         self.name = "rvdbt-" + ("jit", ("qcgaot", "llvmaot")[llvm])[aot] + ("", "-opt")[llvmopt]
         if jit_merge_ls:
@@ -118,15 +118,12 @@ class RVDBTExec(BaseExec):
             self.name += "-hotspot-" + str(hotspot_threshold)
         if not_freq:
             self.name += "-no-freq"
-        if noprop:
-            self.name += "-noprop"
         self.aot = aot
         self.llvm = llvm
         self.hotspot_threshold = hotspot_threshold
         self.jit_merge_ls = jit_merge_ls
         self.llvmopt = llvmopt
         self.not_freq = not_freq
-        self.noprop = noprop
     def setup(self, root, cmd):
         super().setup(root, cmd)
         if not self.aot:
@@ -134,7 +131,7 @@ class RVDBTExec(BaseExec):
             return
         # make sure dbtcache exists
         pargs = [RVDBTExec.build_dir + "/bin/elfaot",
-                 "--propagate-exec-count=" + ("on", "off")[self.noprop],
+                 "--propagate-exec-count=on",
                  "--cache=" + RVDBTExec.cache_dir,
                  "--llvm=" + ("off", "on")[self.llvm],
                  "--threshold=" + str(self.hotspot_threshold),
@@ -351,11 +348,11 @@ def GetBenchmarks_RV32EMU(prebuilts_dir):
     b.append(Benchmark(root + "/", ["nbench", "2"], name="bitfield"))
     b.append(Benchmark(root + "/", ["nbench", "3"], name="emfloat"))
     b.append(Benchmark(root + "/", ["nbench", "5"], name="assignment"))
-    # b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
+    b.append(Benchmark(root + "/", ["nbench", "6"], name="IDEA"))
     b.append(Benchmark(root + "/", ["nbench", "7"], name="Huffman"))
-    # b.append(Benchmark(root + "/", ["dhrystone"]))
+    b.append(Benchmark(root + "/", ["dhrystone"]))
     # b.append(Benchmark(root + "/", ["primes"], cmp_out=True))
-    # b.append(Benchmark(root + "/", ["sha512"], cmp_out=True, prof="abcb268030866addb89628ee612792d3"))
+    b.append(Benchmark(root + "/", ["sha512"], cmp_out=True, prof="abcb268030866addb89628ee612792d3"))
     return b
 
 # rv32emu workload, but compiled with rv32ia
@@ -394,25 +391,25 @@ def GetBenchmarks_SPEC2017Rate(prebuilts_dir):
     b: list[Benchmark] = []
     root = os.path.join(prebuilts_dir)
     # all the args[0]s are the same, just renamed for different cache file
-    b.append(Benchmark(root + "/500.perlbench_r/" , ["perlbench_r_base.riscv_wendell_debug-32", "checkspam.pl", "2500", "5", "25", "11", "150", "1", "1", "1", "1"], name="perl-ref1", prof="083af8c9c06a649f7bc5807de91bf588"))
-    b.append(Benchmark(root + "/500.perlbench_r/" , ["perlbench_r_base.riscv_wendell_debug-32", "diffmail.pl", "4", "800", "10", "17", "19", "300"], name="perl-ref2", prof="083af8c9c06a649f7bc5807de91bf588"))
-    b.append(Benchmark(root + "/500.perlbench_r/" , ["perlbench_r_base.riscv_wendell_debug-32", "splitmail.pl", "6400", "12", "26", "16", "100", "0"], name="perl-ref3", prof="083af8c9c06a649f7bc5807de91bf588"))
+    # b.append(Benchmark(root + "/500.perlbench_r/" , ["perlbench_r_base.riscv_wendell_debug-32", "checkspam.pl", "2500", "5", "25", "11", "150", "1", "1", "1", "1"], name="perl-ref1", prof="083af8c9c06a649f7bc5807de91bf588"))
+    # b.append(Benchmark(root + "/500.perlbench_r/" , ["perlbench_r_base.riscv_wendell_debug-32", "diffmail.pl", "4", "800", "10", "17", "19", "300"], name="perl-ref2", prof="083af8c9c06a649f7bc5807de91bf588"))
+    # b.append(Benchmark(root + "/500.perlbench_r/" , ["perlbench_r_base.riscv_wendell_debug-32", "splitmail.pl", "6400", "12", "26", "16", "100", "0"], name="perl-ref3", prof="083af8c9c06a649f7bc5807de91bf588"))
 
-    # b.append(Benchmark(root + "/502.gcc_r/", ["ref1", "gcc-pp.c", "-O3", "-finline-limit=0", "-fif-conversion", "-fif-conversion2", "-o", "ref1.s"], name="gcc-ref1", prof="37a45829a600f065d02f8349fde44dec"))
-    # b.append(Benchmark(root + "/502.gcc_r/", ["ref2", "gcc-pp.c", "-O2", "-finline-limit=36000", "-fpic", "-o", "ref2.s"], name="gcc-ref2", prof="37a45829a600f065d02f8349fde44dec"))
-    # b.append(Benchmark(root + "/502.gcc_r/", ["ref3", "gcc-smaller.c", "-O3", "-fipa-pta", "-o", "ref3.s"], name="gcc-ref3", prof="37a45829a600f065d02f8349fde44dec"))
-    # b.append(Benchmark(root + "/502.gcc_r/", ["ref4", "ref32.c", "-O5", "-o", "ref4.s"], name="gcc-ref4", prof="37a45829a600f065d02f8349fde44dec"))
-    # b.append(Benchmark(root + "/502.gcc_r/", ["ref5", "ref32.c", "-O3", "-fselective-scheduling", "-fselective-scheduling2", "-o", "ref5.s"], name="gcc-ref5", prof="37a45829a600f065d02f8349fde44dec"))
+    b.append(Benchmark(root + "/502.gcc_r/", ["ref1", "gcc-pp.c", "-O3", "-finline-limit=0", "-fif-conversion", "-fif-conversion2", "-o", "ref1.s"], name="gcc-ref1", prof="37a45829a600f065d02f8349fde44dec"))
+    b.append(Benchmark(root + "/502.gcc_r/", ["ref2", "gcc-pp.c", "-O2", "-finline-limit=36000", "-fpic", "-o", "ref2.s"], name="gcc-ref2", prof="37a45829a600f065d02f8349fde44dec"))
+    b.append(Benchmark(root + "/502.gcc_r/", ["ref3", "gcc-smaller.c", "-O3", "-fipa-pta", "-o", "ref3.s"], name="gcc-ref3", prof="37a45829a600f065d02f8349fde44dec"))
+    b.append(Benchmark(root + "/502.gcc_r/", ["ref4", "ref32.c", "-O5", "-o", "ref4.s"], name="gcc-ref4", prof="37a45829a600f065d02f8349fde44dec"))
+    b.append(Benchmark(root + "/502.gcc_r/", ["ref5", "ref32.c", "-O3", "-fselective-scheduling", "-fselective-scheduling2", "-o", "ref5.s"], name="gcc-ref5", prof="37a45829a600f065d02f8349fde44dec"))
  
-    b.append(Benchmark(root + "/505.mcf_r/" , ["mcf_r_base.riscv_wendell_debug-32", "inp.in"], prof="a3be544809c765eab54401626d24b4f5"))
+    # b.append(Benchmark(root + "/505.mcf_r/" , ["mcf_r_base.riscv_wendell_debug-32", "inp.in"], prof="a3be544809c765eab54401626d24b4f5"))
     
-    b.append(Benchmark(root + "/520.omnetpp_r/", ["omnetpp_r_base.riscv_wendell_debug-32", "-c", "General", "-r", "0"], prof="e8a0fb640a21e3bac3bf100788cdb679"))
+    # b.append(Benchmark(root + "/520.omnetpp_r/", ["omnetpp_r_base.riscv_wendell_debug-32", "-c", "General", "-r", "0"], prof="e8a0fb640a21e3bac3bf100788cdb679"))
 
-    b.append(Benchmark(root + "/523.xalancbmk_r/" , ["cpuxalan_r_base.riscv_wendell_debug-32", "-v", "refrate/t5.xml", "refrate/xalanc.xsl"], prof="a7b11fb066dfc7d7c0c3d4f589ca90ef"))
+    # b.append(Benchmark(root + "/523.xalancbmk_r/" , ["cpuxalan_r_base.riscv_wendell_debug-32", "-v", "refrate/t5.xml", "refrate/xalanc.xsl"], prof="a7b11fb066dfc7d7c0c3d4f589ca90ef"))
 
     # b.append(Benchmark(root + "/525.x264_r/" , ["x264_r_base.riscv_wendell_debug-32", "--pass", "1", "--stats", "x264_stats.log", "--bitrate", "1000", "--frames", "1000", "-o", "BuckBunny_New.264", "BuckBunny.yuv", "1280x720"], name="x264-ref1", prof="ef7fc15cfefb9d5503158f939cf0ac10"))
-    b.append(Benchmark(root + "/525.x264_r/" , ["x264_r_base.riscv_wendell_debug-32", "--pass", "2", "--stats", "x264_stats.log", "--bitrate", "1000", "--dumpyuv", "200", "--frames", "1000", "-o", "BuckBunny_New.264", "BuckBunny.yuv", "1280x720"], name="x264-ref2", prof="ef7fc15cfefb9d5503158f939cf0ac10"))
-    b.append(Benchmark(root + "/525.x264_r/" , ["x264_r_base.riscv_wendell_debug-32", "--seek", "500", "--dumpyuv", "200", "--frames", "1250", "-o", "BuckBunny_New.264", "BuckBunny.yuv", "1280x720"], name="x264-ref3", prof="ef7fc15cfefb9d5503158f939cf0ac10"))
+    # b.append(Benchmark(root + "/525.x264_r/" , ["x264_r_base.riscv_wendell_debug-32", "--pass", "2", "--stats", "x264_stats.log", "--bitrate", "1000", "--dumpyuv", "200", "--frames", "1000", "-o", "BuckBunny_New.264", "BuckBunny.yuv", "1280x720"], name="x264-ref2", prof="ef7fc15cfefb9d5503158f939cf0ac10"))
+    # b.append(Benchmark(root + "/525.x264_r/" , ["x264_r_base.riscv_wendell_debug-32", "--seek", "500", "--dumpyuv", "200", "--frames", "1250", "-o", "BuckBunny_New.264", "BuckBunny.yuv", "1280x720"], name="x264-ref3", prof="ef7fc15cfefb9d5503158f939cf0ac10"))
 
     b.append(Benchmark(root + "/531.deepsjeng_r/" , ["deepsjeng_r_base.riscv_wendell_debug-32", "ref.txt"], name="deepsjeng-ref", prof="03775932bdec0f4d1ea6738257da1cee"))
     
@@ -621,8 +618,6 @@ def RunTests(opts):
             # execs.append(RVDBTExec(True, llvm=True, hotspot_threshold=268435456)) 
             # execs.append(RVDBTExec(True, llvm=True, hotspot_threshold=536870912)) 
             # execs.append(RVDBTExec(True, llvm=True, hotspot_threshold=1073741824)) 
-        if opts.rvdbt_llvmaot_noprop:
-            execs.append(RVDBTExec(True, llvm=True, hotspot_threshold=262144, not_freq=True, noprop=True)) 
         return execs
     
     # if opts.objective == "test":
@@ -711,7 +706,6 @@ def main():
     op.add_option("--rvdbt-llvmaot-1000", action="store_true", dest="rvdbt_llvmaot_1000", default=False)
     op.add_option("--rvdbt-llvmaot-opt", action="store_true", dest="rvdbt_llvmaot_opt", default=False)
     op.add_option("--rvdbt-llvmaot-hotspot", action="store_true", dest="rvdbt_llvmaot_hotspot", default=False)
-    op.add_option("--rvdbt-llvmaot-noprop", action="store_true", dest="rvdbt_llvmaot_noprop", default=False)
     op.add_option("--libriscv", action="store_true", dest="libriscv", default=False)
     op.add_option("--benchmark", dest="benchmark", type="choice", 
                  choices=["automotive", "network", "security", "telecomm", "coremark", "rv32emu", "rv32ia", "rv32i", "mibench", "SPEC2017Rate", "SPEC2017RateTrain"], default="automotive",

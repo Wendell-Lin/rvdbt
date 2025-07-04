@@ -19,6 +19,7 @@ struct ElfRunOptions {
 	bool merge_ls{};
 	bool trace{};
 	std::string logs{};
+	bool not_freq{};
 };
 
 static std::pair<std::span<char *>, std::span<char *>> SplitArgs(unsigned argc, char **argv)
@@ -62,7 +63,8 @@ static bool ParseOptions(ElfRunOptions &o, int argc, char **argv)
 	    ("cache",  bpo::value(&o.cache)->required(), "dbt cache path")
 	    ("aot",    bpo::value(&o.use_aot)->default_value(false), "boot aot file if available")
 	    ("merge-ls", bpo::value(&o.merge_ls)->default_value(false), "merge load/store instructions")
-	    ("trace", bpo::value(&o.trace)->default_value(false), "enable trace cache");
+	    ("trace", bpo::value(&o.trace)->default_value(false), "enable trace cache")
+	    ("not-freq", bpo::value(&o.not_freq)->default_value(false), "disable frequency tracking");
 	// clang-format on
 
 	try {
@@ -100,6 +102,7 @@ static void SetupConfig(ElfRunOptions &opts)
 	dbt::config::merge_ls = opts.merge_ls;
 	dbt::config::trace = opts.trace;
 	dbt::config::use_aot = opts.use_aot;
+	dbt::config::not_freq = opts.not_freq;
 }
 
 int main(int argc, char **argv)

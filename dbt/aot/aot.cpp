@@ -35,11 +35,15 @@ ModuleGraph BuildModuleGraph(objprof::PageData const &page)
 		}
 	}
 
+	// we use a variable to aggregate the execution count of the same IP range
+	// and a map to decrement the IP if the current IP passes the range.
+	u64 exec_count = 0;
+	std::map<u32, u64> exec_count_map;
 	for (size_t idx = 0; idx < iplist.size(); ++idx) {
 		u32 ip = iplist[idx];
 		u32 ip_next = (idx == iplist.size() - 1) ? next_page_vaddr : iplist[idx + 1];
 
-		rv32::RV32Analyser::Analyse(&mg, ip, ip_next, (uptr)mmu::base);
+		rv32::RV32Analyser::Analyse(&mg, ip, ip_next, (uptr)mmu::base, exec_count, exec_count_map);
 	}
 
 	return mg;

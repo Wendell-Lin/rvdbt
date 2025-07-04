@@ -143,6 +143,16 @@ static void dbt_sigaction_memory(int signo, siginfo_t *sinfo, void *uctx_raw)
 
 	state->DumpTrace("signal");
 	log_ukernel("\tfault:guest: pc=%08x, si_addr=%08x", state->ip, g_faddr);
+	
+	// Add more detailed error information
+	log_ukernel("\tmemory access type: %s", 
+		sinfo->si_code == SEGV_ACCERR ? "protection violation" :
+		sinfo->si_code == SEGV_MAPERR ? "address not mapped" : "unknown");
+	
+	// Check if the address is in a valid page
+	u32 page_addr = g_faddr & mmu::PAGE_MASK;
+	log_ukernel("\tpage address: %08x", page_addr);
+	
 	Panic("Memory fault in guest address space. See logs for more details");
 }
 
@@ -208,6 +218,19 @@ void ukernel::SetFSRoot(const char *fsroot_)
 	process.guest_cwd = "/";  // Initialize guest cwd to root
 }
 
+static int NormalizePath(char *&path)
+{
+	int j = 0;
+	for (int i = 0; path[i] != '\0'; i++) {
+		if (path[i] == '/' && path[i+1] == '/') {
+			continue;
+		}
+		path[j++] = path[i];
+	}
+	path[j] = '\0';
+	return 0;
+}
+
 static int PathResolution(int dirfd, char const *path, char *resolved)
 {
 	char rp_buf[PATH_MAX];
@@ -224,11 +247,24 @@ static int PathResolution(int dirfd, char const *path, char *resolved)
 	// Handle absolute and relative paths
 	if (path[0] == '/') {
 		// For absolute paths, treat them as relative to fsroot
-		snprintf(rp_buf, sizeof(rp_buf), "%s", path);
+		// TODO: some path resolution use /a/b/c to get c under /a/b with fsroot = /a/b
+		// but there might be a problem if the path is actually /a/b/a/b/c, but we get /a/b/c
+		if (strstr(path, fsroot.c_str()) == path) {
+			snprintf(rp_buf, sizeof(rp_buf), "%s", path);
+		} else {
+			snprintf(rp_buf, sizeof(rp_buf), "%s%s", fsroot.c_str(), path);
+		}
 	} else {
 		// For relative paths with AT_FDCWD, treat as relative to fsroot
 		if (dirfd == AT_FDCWD) {
-			snprintf(rp_buf, sizeof(rp_buf), "%s%s", fsroot.c_str(), path);
+			const auto &guest_cwd = ukernel::process.guest_cwd;
+			std::string path_from_root;
+			if (guest_cwd == "/") {
+				path_from_root = path;
+			} else {
+				path_from_root = guest_cwd.substr(1) + "/" + path;
+			}
+			snprintf(rp_buf, sizeof(rp_buf), "%s%s", fsroot.c_str(), path_from_root.c_str());
 		} else {
 			char fdpath[64];
 			sprintf(fdpath, "/proc/self/fd/%d", dirfd);
@@ -310,7 +346,10 @@ static inline uabi_long rcerrno(uabi_long rc)
 static uabi_long linux_openat(uabi_int dfd, const char __user *filename, uabi_int flags, mode_t mode)
 {
 	DBT_FS_LOCK();
-	return rcerrno(openat(dfd, filename, flags, mode));
+	char pathbuf[PATH_MAX];
+	PathResolution(dfd, filename, pathbuf);
+	// the new path may not exist, so we don't need to check errno	
+	return rcerrno(openat(AT_FDCWD, pathbuf, flags, mode));
 }
 
 static uabi_long linux_close(uabi_uint fd)
@@ -358,7 +397,7 @@ static uabi_long linux_readlinkat(uabi_int dfd, const char __user *path, char __
 	char pathbuf[PATH_MAX];
 	if (*path) {
 		if (PathResolution(dfd, path, pathbuf) < 0) {
-			return uerrno(-errno);
+			return rcerrno(-errno);
 		}
 	} else {
 		pathbuf[0] = 0;
@@ -509,6 +548,40 @@ static uabi_long linux_brk(uabi_ulong newbrk)
 	memset(mmu::g2h(brk), 0, brk_p - brk);
 	return brk = newbrk;
 }
+	// if (newbrk == 0) {
+	// 	return brk;
+	// }
+
+	// uabi_ulong old_brk = brk;
+	// uabi_ulong old_brk_page_end = roundup(old_brk, mmu::PAGE_SIZE);
+	// uabi_ulong new_brk_page_end = roundup(newbrk, mmu::PAGE_SIZE);
+
+	// // Ensure the page containing the current brk is writable.
+	// if (old_brk > 0) {
+	// 	uabi_ulong old_brk_page_start = (old_brk - 1) & ~(mmu::PAGE_SIZE - 1);
+	// 	if (mprotect(mmu::g2h(old_brk_page_start), mmu::PAGE_SIZE, PROT_READ | PROT_WRITE) != 0) {
+	// 		log_ukernel("brk: mprotect failed on page %08lx: %s", old_brk_page_start,
+	// 			    strerror(errno));
+	// 		return old_brk;
+	// 	}
+	// }
+
+	// // If we need *new* pages, map them.
+	// if (new_brk_page_end > old_brk_page_end) {
+	// 	uabi_ulong map_start = old_brk_page_end;
+	// 	uabi_ulong map_size = new_brk_page_end - map_start;
+	// 	void *mem = mmu::mmap(map_start, map_size, PROT_READ | PROT_WRITE,
+	// 			      MAP_ANON | MAP_PRIVATE | MAP_FIXED);
+	// 	if (mmu::h2g(mem) != map_start) {
+	// 		log_ukernel("do_sys_brk: mmap for new pages failed");
+	// 		munmap(mem, map_size);
+	// 		return old_brk;
+	// 	}
+	// }
+
+	// memset(mmu::g2h(old_brk), 0, newbrk - old_brk);
+	// return brk = newbrk;
+	// }
 
 static uabi_long linux_munmap(uabi_ulong gaddr, uabi_size_t len)
 {
@@ -685,7 +758,15 @@ static uabi_long linux_gettimeofday(struct timeval __user *tv, struct timezone _
 
 static uabi_long linux_renameat2(int olddfd, const char __user *oldpath, int newdfd, const char __user *newpath, unsigned flags)
 {
-    return rcerrno(renameat2(olddfd, oldpath, newdfd, newpath, flags));
+	char old_pathbuf[PATH_MAX];
+	if (PathResolution(olddfd, oldpath, old_pathbuf) < 0) {
+		return rcerrno(-errno);
+	}
+	char new_pathbuf[PATH_MAX];
+	if (PathResolution(newdfd, newpath, new_pathbuf) < 0) {
+		return rcerrno(-errno);
+	}
+	return rcerrno(renameat2(AT_FDCWD, old_pathbuf, AT_FDCWD, new_pathbuf, flags));
 }
 
 static uabi_long linux_ioctl(uabi_uint fd, uabi_uint cmd, uabi_ulong arg)
@@ -705,57 +786,72 @@ static uabi_long linux_ftruncate64(uabi_uint fd, uabi_ulong length)
 static uabi_long linux_getcwd(char __user *buf, uabi_size_t size)
 {
 	char *host_buf = (char *)mmu::g2h(reinterpret_cast<uintptr_t>(buf));
-	char *ret = getcwd(host_buf, size);
-	if (ret == nullptr) {
-		return uerrno(-errno);
+	
+	// Return the guest's view of cwd that we track
+	const std::string& guest_cwd = ukernel::process.guest_cwd;
+	size_t len = guest_cwd.length();
+	
+	// Check buffer size
+	if (size < len + 1) {
+		return -ERANGE;
 	}
-	return strlen(host_buf) + 1;
+	
+	// Copy the guest path to buffer
+	memcpy(host_buf, guest_cwd.c_str(), len + 1);
+	log_ukernel("getcwd: returning guest_cwd='%s'", host_buf);
+	
+	return len + 1;
 }
 
 static uabi_long linux_chdir(const char __user *filename)
 {
-	char pathbuf[PATH_MAX];
-	const char *host_filename = (const char *)mmu::g2h(reinterpret_cast<uintptr_t>(filename));
-	
-	log_ukernel("chdir: input path='%s'", host_filename);
+    char *path = (char *)mmu::g2h(reinterpret_cast<uintptr_t>(filename));
 
-	// Use PathResolution to get the actual target path
-	if (PathResolution(AT_FDCWD, host_filename, pathbuf) < 0) {
-		return uerrno(-errno);
-	}
+    // Verify directory exists and is accessible
+	NormalizePath(path);
+    log_ukernel("chdir: input path='%s'", path);
+    char pathbuf[PATH_MAX];
+    if (PathResolution(AT_FDCWD, path, pathbuf) < 0) {
+        return uerrno(-errno);
+    }
+    
+    struct stat st;
+    if (stat(pathbuf, &st) < 0 || !S_ISDIR(st.st_mode)) {
+        return uerrno(-ENOTDIR);
+    }
 
-	// Verify it's a directory
-	struct stat st;
-	if (stat(pathbuf, &st) < 0) {
-		log_ukernel("chdir: stat failed: %s", strerror(errno));
-		return uerrno(-errno);
-	}
+    // Update guest_cwd based on input path
+    if (path[0] == '/') {
+        // Absolute path - just use it directly
+        ukernel::process.guest_cwd = path;
+    } else {
+        // Relative path - combine with current guest_cwd
+        if (ukernel::process.guest_cwd == "/") {
+            ukernel::process.guest_cwd = "/" + std::string(path);
+        } else {
+            ukernel::process.guest_cwd += "/" + std::string(path);
+        }
+    }
 
-	if (!S_ISDIR(st.st_mode)) {
-		log_ukernel("chdir: not a directory");
-		return uerrno(-ENOTDIR);
-	}
-
-	// Get guest path by stripping fsroot
-	std::string new_guest_cwd;
-	if (strncmp(pathbuf, ukernel::process.fsroot.c_str(), ukernel::process.fsroot.length() - 1) == 0) {
-		new_guest_cwd = std::string("/") + (pathbuf + ukernel::process.fsroot.length());
-	} else {
-		log_ukernel("chdir: resolved path escapes fsroot");
-		return uerrno(-EACCES);
-	}
-
-	// Update guest's view of cwd
-	ukernel::process.guest_cwd = new_guest_cwd;
-	log_ukernel("chdir: updated guest_cwd to '%s'", new_guest_cwd.c_str());
-
-	return 0;
+    log_ukernel("chdir: updated guest_cwd to '%s'", ukernel::process.guest_cwd.c_str());
+    return 0;
 }
 
 static uabi_long linux_getdents64(uabi_uint fd, struct linux_dirent64 __user *dirp, uabi_uint count)
 {
 	struct linux_dirent64 *host_dirp = (struct linux_dirent64 *)mmu::g2h(reinterpret_cast<uintptr_t>(dirp));
 	return rcerrno(getdents64(fd, host_dirp, count));
+}
+
+static uabi_long linux_unlinkat(int dfd, const char __user *path, int flags)
+{
+	char pathbuf[PATH_MAX];
+	if (PathResolution(dfd, path, pathbuf) < 0) {
+		return rcerrno(-errno);
+	}
+	
+	log_ukernel("unlinkat: ignoring delete request for: %s", pathbuf);
+	return rcerrno(unlinkat(dfd, pathbuf, flags));
 }
 
 } // namespace ukernel_syscall
@@ -808,7 +904,8 @@ void ukernel::Syscall(CPUState *state)
 	X(linux_ftruncate64)                                                                                 \
 	X(linux_getcwd)                                                                                      \
 	X(linux_chdir)                                                                                       \
-	X(linux_getdents64)
+	X(linux_getdents64)                                                                                 \
+	X(linux_unlinkat)
 
 #define SKIPPED_SYSCALLS(X) X(linux_set_robust_list)
 
@@ -884,7 +981,7 @@ void ukernel::InitElfMappings(const char *path, ElfImage *elf)
 	process.exe_fd = fd;
 	process.brk = elf->brk;
 
-	static constexpr u32 stk_size = 8_MB; // switch to 32 * mmu::PAGE_SIZE if debugging
+	static constexpr u32 stk_size = 32_MB; // Increased from 8MB to 32MB for large applications like xalancbmk
 #if 0
 	void *stk_ptr = mmu::MMap(0, stk_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE);
 #else

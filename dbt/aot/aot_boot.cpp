@@ -2,6 +2,7 @@
 #include "dbt/qmc/compile.h"
 #include "dbt/tcache/objprof.h"
 #include "dbt/util/fsmanager.h"
+#include "dbt/execute.h"
 
 #include <sstream>
 #include <fstream>
@@ -44,10 +45,10 @@ void BootAOTFile()
 	{
 		DBT_FS_LOCK();
 		auto aot_path = objprof::GetCachePath(AOT_SO_EXTENSION);
-		log_aot("profile name: %s", aot_path.c_str());
+		log_dbt("profile name: %s", aot_path.c_str());
 
 		if (so_handle = dlopen(aot_path.c_str(), RTLD_NOW); !so_handle) {
-			log_aot("failed to open %s: %s, skip aot boot", aot_path.c_str(), dlerror());
+			log_dbt("failed to open %s: %s, skip aot boot", aot_path.c_str(), dlerror());
 		}
 		if (dlinfo(so_handle, RTLD_DI_LINKMAP, (void *)&lmap) < 0) {
 			Panic();
@@ -68,13 +69,15 @@ void BootAOTFile()
 		tb->tcode = TBlock::TCode{l_addr + sym->aot_vaddr, 0};
 		tcache::Insert(tb);
 		tcache::CacheBr(tb); // todo: validate this if a brcc to llvm aot occurs.
+		tcache::CacheBrind(tb);
+		log_dbt("announce ip: %x", tb->ip);
 	};
 
 	for (u64 idx = 0; idx < aottab->n_sym; ++idx) {
 		announce(&aottab->sym[idx]);
 	}
 	size_t vm_size = get_vm_size();
-	log_aot("aot size: %zu KB", vm_size - vm_size_before);
+	log_dbt("aot size: %zu KB", vm_size - vm_size_before);
 }
 
 } // namespace dbt

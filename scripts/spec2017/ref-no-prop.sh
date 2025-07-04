@@ -2,11 +2,13 @@ python3 examples/benchmarks.py \
     --rvdbt-build-dir $(pwd)/build-llvm-20 \
     --libriscv-build-dir /home/wendell/libriscv/emulator \
     --prebuilts $(pwd)/prebuilts \
-    --cache-dir rvdbt \
-    --riscv32-gcc riscv32-unknown-linux-gnu-gcc \
-    --rvdbt-jit \
-    --rvdbt-llvmaot \
+    --riscv32-gcc riscv32-unknown-elf-gcc \
+    --cache-dir spec2017-ref-tb-noprop \
+    --no-qemu \
     --rvdbt-llvmaot-hotspot \
-    --benchmark mibench
+    --rvdbt-llvmaot-noprop \
+    --benchmark SPEC2017Rate
+    # --rvdbt-jit \
+    # --rvdbt-llvmaot \
     # --rvdbt-qcgaot \
     # --libriscv

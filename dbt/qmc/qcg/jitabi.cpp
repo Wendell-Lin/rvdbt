@@ -82,9 +82,9 @@ HELPER_ASM void qcgstub_escape_brind()
 // Caller uses 2nd value in returned pair as jump target
 static ALWAYS_INLINE _RetPair TryLinkBranch(CPUState *state, ppoint::BranchSlot *slot)
 {
-	// if (dbt::config::trace) {
-	// 	state->DumpTraceCache(slot->gip, state->ip);
-	// }
+	if (dbt::config::trace) {
+		state->DumpTraceCache(slot->gip, state->ip);
+	}
 	auto found = tcache::Lookup(slot->gip);
 	if (likely(found)) {
 		// found->flags.exec_count += 1;
@@ -147,13 +147,13 @@ HELPER _RetPair qcg_TryLinkBranchLLVMAOT(CPUState *state, void *retaddr, uptr in
 // Indirect branch slowpath
 HELPER void *qcgstub_brind(CPUState *state, u32 gip)
 {
-	// if (dbt::config::trace) {
-	// 	state->DumpTraceCache(gip, state->ip);
-	// }
+	if (dbt::config::trace) {
+		state->DumpTraceCache(gip, state->ip);
+	}
 	state->ip = gip;
 	auto *found = tcache::Lookup(gip);
 	if (likely(found)) {
-		found->flags.exec_count += 1;
+		// found->flags.exec_count += 1;
 		tcache::CacheBrind(found);
 		return (void *)found->tcode.ptr;
 	}

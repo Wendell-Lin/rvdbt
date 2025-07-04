@@ -1,10 +1,14 @@
 python3 examples/benchmarks.py \
-    --rvdbt-build-dir $(pwd)/build-llvm-$1 \
+    --rvdbt-build-dir $(pwd)/build-llvm-20 \
+    --cache-dir rv32emu-no-prop \
     --libriscv-build-dir /home/wendell/libriscv/emulator \
     --prebuilts $(pwd)/prebuilts \
-    --riscv32-gcc riscv32-unknown-elf-gcc \
+    --riscv32-gcc riscv32-unknown-linux-gnu-gcc \
+    --no-qemu \
     --rvdbt-jit \
-    --rvdbt-llvmaot-1000 \
     --rvdbt-llvmaot \
+    --rvdbt-llvmaot-hotspot \
+    --rvdbt-llvmaot-noprop \
     --benchmark rv32emu \
-    --objective test
+    # --libriscv \
+    # --objective test

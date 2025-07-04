@@ -48,9 +48,9 @@ static inline IpRange GetCompilationIPRange(u32 ip)
 		return {ip, upper};
 	}
 	// TODO: this avoid translate until an existing TB, whose IP range may overlap with the new one that is hard to profile
-	// if (auto *tb_upper = tcache::LookupUpperBound(ip)) {
-	// 	upper = std::min(upper, tb_upper->ip);
-	// }
+	if (auto *tb_upper = tcache::LookupUpperBound(ip)) {
+		upper = std::min(upper, tb_upper->ip);
+	}
 	return {ip, upper};
 }
 
